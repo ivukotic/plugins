@@ -131,12 +131,13 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
                             System.out.println("found "+replicas.size()+" replicas.");
                             for (ReplicaDesc replica : replicas){
                                 String line=replica.getSfn();
-                                if (line.indexOf(SRM_HOST)==-1) continue;
-                                System.out.println("replica found \n "+ replica.toString());
-                                int li=line.lastIndexOf("=")+1;
-                                PFN=line.substring(li);
-                                System.out.println("PFN: " + PFN);
-                                return PFN;
+                                if (replica.getHost().equals(SRM_HOST)) {
+                                    System.out.println("replica found \n "+ replica.toString());
+                                    int li=line.lastIndexOf("=")+1;
+                                    PFN=line.substring(li);
+                                    System.out.println("PFN: " + PFN);
+                                    return PFN;
+                                }
                             }
                             System.err.println("*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
                             return "";
@@ -151,8 +152,8 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
         
         else{ // access through lcg-lr
             
-            System.out.println("Trying to use: lcg-lr " + sLFN);
-            ProcessBuilder pb = new ProcessBuilder("lcg-lr", sLFN);
+            System.out.println("Trying to use lcg-lr " + sLFN);
+            ProcessBuilder pb = new ProcessBuilder("lcg-lr", sLFN, "--connect-timeout","10");
             Map<String, String> env = pb.environment();
             try{
                 Process p = pb.start();
