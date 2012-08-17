@@ -165,12 +165,20 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
                 while ((line = br.readLine()) != null) {
                   // System.out.println(line);
                   if (line.indexOf(SRM_HOST)==-1) continue;
-                  Integer ind=line.indexOf("/",6);
-                  if (ind>0) {
+                  Integer ind=line.indexOf("=")+1;
+                  if (ind > 0){ //long form
+                        PFN=line.substring(ind);
+                        System.out.println("PFN: " + PFN);
+                        return PFN;
+                  }
+                  ind=line.indexOf("/",6);
+                  if (ind>0) { //short form
                       PFN=line.substring(ind);
                       System.out.println("PFN: " + PFN);
                       return PFN;
                       }
+                   System.out.println("Could not interpret LFC name: "+line);
+                   return line;  
                 }
                 // System.out.println("lcg-lr returned.");
 
