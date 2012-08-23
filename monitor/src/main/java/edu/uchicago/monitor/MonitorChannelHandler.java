@@ -1,34 +1,31 @@
 package edu.uchicago.monitor;
 
-import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
-import org.dcache.xrootd.protocol.messages.XrootdRequest;
 import org.dcache.xrootd.protocol.messages.AbstractResponseMessage;
-
-import org.dcache.xrootd.protocol.messages.OpenRequest;
+import org.dcache.xrootd.protocol.messages.CloseRequest;
 import org.dcache.xrootd.protocol.messages.LoginRequest;
 import org.dcache.xrootd.protocol.messages.LoginResponse;
-import org.dcache.xrootd.protocol.messages.EndSessionResponse;
-
-import org.jboss.netty.buffer.ChannelBuffer;
+import org.dcache.xrootd.protocol.messages.OpenRequest;
+import org.dcache.xrootd.protocol.messages.OpenResponse;
+import org.dcache.xrootd.protocol.messages.XrootdRequest;
 import org.jboss.netty.channel.ChannelEvent;
-import org.jboss.netty.channel.ChannelStateEvent;
-import org.jboss.netty.channel.ChannelState;
-import org.jboss.netty.channel.WriteCompletionEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ChannelState;
+import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
-
-import java.util.ArrayList;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicLong;
+import org.jboss.netty.channel.WriteCompletionEvent;
+//import org.dcache.xrootd.protocol.messages.EndSessionResponse;
+//import org.jboss.netty.buffer.ChannelBuffer;
 
 public class MonitorChannelHandler extends SimpleChannelHandler
 {
     
     private final Collector collector;
-
-    private final ArrayList<FileStatistics> descriptors = new ArrayList<FileStatistics>();
+    private final Map<Integer, FileStatistics> descriptors=new HashMap<Integer, FileStatistics>();
     private final UUID connectionId = UUID.randomUUID();
     private int connId=0;
     private long duration;
@@ -59,16 +56,28 @@ public class MonitorChannelHandler extends SimpleChannelHandler
             // filename
             else if (message instanceof OpenRequest){
                 OpenRequest or=(OpenRequest)message;
-                boolean mode = true; 
-                if (or.isReadOnly()) mode=true; else mode=false;         // not correct
-                System.out.println("FILE OPEN EVENT --------------------");
+                int mode = 1; 
+                if (or.isReadOnly()) mode=1; else mode=0;         // not correct
+                System.out.println("FILE OPEN EVENT -------------------- stream Id: "+or.getStreamId());
                 System.out.println("connUUID:   "+connectionId.toString());
                 System.out.println("connId:     "+connId);
                 System.out.println("path:     "+ or.getPath());
                 System.out.println("readonly: " + mode);
+                FileStatistics fs=new FileStatistics( );
+                fs.filename=or.getPath();
+                fs.mode=mode;
+                descriptors.put(or.getStreamId(), fs);
                 System.out.println("------------------------------------");
             }
-
+            else if (message instanceof CloseRequest){
+                CloseRequest cr=(CloseRequest)message;
+                System.out.println("FILE CLOSE EVENT --------------------");
+                System.out.println("connUUID:   "+connectionId.toString());
+                System.out.println("connId:     "+connId);
+                collector.closeEvent(connectionId, descriptors.get(cr.getFileHandle()));
+                descriptors.remove(cr.getFileHandle());
+                System.out.println("------------------------------------");
+            }
 
             else if (message instanceof XrootdRequest) {
                 XrootdRequest req = (XrootdRequest) message;
@@ -80,7 +89,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler
             System.out.println("Channel State Event UP : " + se.getState().toString());// +"\t"+ se.getValue().toString());
             if (se.getState()==ChannelState.OPEN && se.getValue()!=null){
                 if (se.getValue()==Boolean.TRUE){
-                    System.out.println("OPEN ATTEMPT EVENT --------------------");
+                    System.out.println("CONNECTION OPEN ATTEMPT EVENT --------------------");
                     collector.addConnectionAttempt();
                     System.out.println("---------------------------------------");
                 }
@@ -121,14 +130,13 @@ public class MonitorChannelHandler extends SimpleChannelHandler
             
             MessageEvent me=(MessageEvent) e;
             System.out.println("RES: " + me.toString());
-            System.out.println("remote address: " + me.getRemoteAddress());
+//            System.out.println("remote address: " + me.getRemoteAddress());
             Object message=me.getMessage();
             connId=me.getChannel().getId();
             System.out.println("connId:         " + connId);
             System.out.println("message:        " + message.toString());
             if (message instanceof LoginResponse){
-                LoginResponse lr = (LoginResponse) message;
-                
+//                LoginResponse lr = (LoginResponse) message;
                 // System.out.println("reqID: " + lr.getRequest().getStreamId());
                 // int [] sessionID= new int[2];
                 //  ChannelBuffer ssid = lr.getBuffer();
@@ -157,7 +165,24 @@ public class MonitorChannelHandler extends SimpleChannelHandler
                 collector.connectedEvent(connectionId, e.getChannel().getRemoteAddress());
                 System.out.println("------------------------------------");
             }
-
+            else if (message instanceof OpenResponse){
+            	OpenResponse OR=(OpenResponse) message;
+            	Integer streamID=OR.getRequest().getStreamId();
+            	System.out.println("FILE OPEN RESPONSE ---------------------------- stream Id: "+streamID);
+            	System.out.println("filehandle: "+ OR.getFileHandle());
+            	System.out.println("filesize  : "+ OR.getFileStatus().getSize());
+//            	System.out.println("fileid    : "+ OR.getFileStatus().getId());
+//            	System.out.println("filestatus: "+ OR.getFileStatus().toString());
+            	FileStatistics fs=descriptors.get(streamID);
+            	if (fs==null){
+            		System.err.println("Serious problem: can not find file with handle " +streamID);
+            	}
+            	fs.filesize=OR.getFileStatus().getSize();
+            	descriptors.put(OR.getFileHandle(), fs);
+            	descriptors.remove(streamID);
+            	collector.openEvent(connectionId, fs);
+            	System.out.println("-----------------------------------------------");
+            }
             else if ( message instanceof AbstractResponseMessage) {
                 AbstractResponseMessage ARM=(AbstractResponseMessage) message;
                 XrootdRequest req = ARM.getRequest();

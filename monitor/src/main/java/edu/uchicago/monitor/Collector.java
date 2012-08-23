@@ -1,10 +1,7 @@
 package edu.uchicago.monitor;
 
-import org.dcache.xrootd.util.FileStatus;
-
 import java.net.SocketAddress;
 import java.util.UUID;
-
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -20,17 +17,17 @@ public class Collector
         connectionAttempts.getAndIncrement();
     }
     
-    public void openEvent(UUID connectionId, String path, UUID fileId, FileStatus status, int options)
+    public void openEvent(UUID connectionId, FileStatistics fs)
     {
         // Note that status may be null - only available if client requested it
-        System.out.println(">>>Opened " + connectionId + " " + path + " " + fileId + " " + status + " " + options);
+        System.out.println(">>>Opened " + connectionId + " " + fs.fileId + " " + fs.filename + " " + fs.filesize + " " + fs.mode);
     }
 
-    public void closeEvent(UUID connectionId, FileStatistics statistics)
+    public void closeEvent(UUID connectionId, FileStatistics fs)
     {
-        System.out.println(">>>Closed " + connectionId + " " + statistics.bytesRead + " bytes read " +
-            statistics.bytesWritten + " bytes written " + statistics.reads + " reads " +
-            statistics.writes + " writes " + statistics.vectorReads + " vector reads");
+        System.out.println(">>>Closed " + connectionId + "\nfileid "+ fs.fileId + "\nbytesRead " + fs.bytesRead + "\n bytesWritten " +
+            fs.bytesWritten + "\nreads " + fs.reads + "\nwrites  " +
+            fs.writes + "\nvectorReads " + fs.vectorReads + ".");
     }
 
     public void connectedEvent(UUID connectionId, SocketAddress remoteAddress)

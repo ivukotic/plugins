@@ -11,7 +11,7 @@ import org.jboss.netty.channel.ChannelHandler;
 public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
 {
     final static String NAME = "edu.uchicago.monitor";    
-    final static Set<String> ALTERNATIVE_NAMES = new HashSet(Arrays.asList(NAME));
+    final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
     private Collector collector;
     
     static boolean hasName(String name)
