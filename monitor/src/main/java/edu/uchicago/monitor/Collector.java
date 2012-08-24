@@ -10,8 +10,8 @@ public class Collector
     private AtomicInteger connectionAttempts    = new AtomicInteger();
     private AtomicInteger currentConnections    = new AtomicInteger();
     private AtomicInteger successfulConnections = new AtomicInteger();
-    private AtomicLong totBytesRead             = new AtomicLong();
-    private AtomicLong totBytesWriten           = new AtomicLong();
+    public AtomicLong totBytesRead             = new AtomicLong();
+    public AtomicLong totBytesWriten           = new AtomicLong();
 
     public void addConnectionAttempt(){
         connectionAttempts.getAndIncrement();
@@ -20,14 +20,12 @@ public class Collector
     public void openEvent(UUID connectionId, FileStatistics fs)
     {
         // Note that status may be null - only available if client requested it
-        System.out.println(">>>Opened " + connectionId + " " + fs.fileId + " " + fs.filename + " " + fs.filesize + " " + fs.mode);
+        System.out.println(">>>Opened " + connectionId + "\n" + fs.toString());
     }
 
     public void closeEvent(UUID connectionId, FileStatistics fs)
     {
-        System.out.println(">>>Closed " + connectionId + "\nfileid "+ fs.fileId + "\nbytesRead " + fs.bytesRead + "\n bytesWritten " +
-            fs.bytesWritten + "\nreads " + fs.reads + "\nwrites  " +
-            fs.writes + "\nvectorReads " + fs.vectorReads + ".");
+        System.out.println(">>>Closed " + connectionId +"\n" +fs.toString());
     }
 
     public void connectedEvent(UUID connectionId, SocketAddress remoteAddress)

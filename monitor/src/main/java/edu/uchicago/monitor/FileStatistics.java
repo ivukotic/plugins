@@ -15,4 +15,19 @@ class FileStatistics
     public final AtomicLong vectorReads = new AtomicLong();
     public final AtomicLong writes = new AtomicLong();
     
+    @Override
+    public String toString(){
+    	String res="filename:\t"+filename;
+    	res+="\nfileId:\t"+fileId.toString();
+    	res+="\nmode:\t"+mode;
+    	res+="\nsize:\t"+filesize;
+    	res+="\nwrite:\t"+bytesWritten+" bytes";
+    	res+="\nread:\t"+bytesRead+" bytes";
+    	res+="\nreads:\t"+reads;
+    	res+="\nVreads:\t"+vectorReads;
+    	res+="\nwrites:\t"+writes;
+    	return res;
+    	
+    }
+    
 }
