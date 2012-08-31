@@ -8,8 +8,7 @@ import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 public class MonitorChannelHandlerProvider implements ChannelHandlerProvider
 {
     @Override
-    public ChannelHandlerFactory
-        createFactory(String plugin, Properties properties)
+    public ChannelHandlerFactory createFactory(String plugin, Properties properties)
     {
         if (MonitorChannelHandlerFactory.hasName(plugin)) {
             return new MonitorChannelHandlerFactory(properties);

@@ -20,8 +20,24 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
     }
 
     public MonitorChannelHandlerFactory(Properties properties)
-    {
-        collector = new Collector();
+    {	String site=properties.getProperty("sitename");
+		String host=properties.getProperty("hostname");
+		String sport=properties.getProperty("port");
+		String sdelay=properties.getProperty("delay");
+		site="TEST.uc";
+		host="atl-prod05.slac.stanford.edu";
+		sport="9931";
+		sdelay="15";
+    		System.out.println("site: "+site);
+    		System.out.println("host: "+host);
+    		System.out.println("port: "+sport);
+    		System.out.println("delay: "+sdelay);
+    	if(site==null||host==null||sport==null){
+    		System.err.println("Monitor not intialized properly. Exiting.");
+    		System.exit(1);
+    	}
+    	if (sdelay==null) sdelay="60";
+        collector = new Collector(site, host, Integer.parseInt(sport), Integer.parseInt(sdelay));
     }
 
     @Override

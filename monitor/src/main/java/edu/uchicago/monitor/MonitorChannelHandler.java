@@ -30,9 +30,14 @@ public class MonitorChannelHandler extends SimpleChannelHandler
     private final UUID connectionId = UUID.randomUUID();
     private int connId=0;
     private long duration;
+    private boolean debug=false;
     
     public MonitorChannelHandler(Collector aCollector){
         collector = aCollector;
+        if (System.getProperties().getProperty("log")=="debug") {
+        	debug=true;
+        	System.out.println("turning ON debug printouts.");
+        }
     }
     
     @Override
@@ -42,7 +47,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler
         if (e instanceof MessageEvent) {
             
             MessageEvent me=(MessageEvent) e;
-            System.out.println("REQ: " + me.toString());
+            if (debug) System.out.println("REQ: " + me.toString());
             Object message=me.getMessage();
      
             if (message instanceof ReadRequest){
@@ -124,7 +129,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler
         }
         else if(e instanceof ChannelStateEvent){
             ChannelStateEvent se=(ChannelStateEvent)e;
-            System.out.println("Channel State Event UP : " + se.getState().toString());// +"\t"+ se.getValue().toString());
+            if (debug) System.out.println("Channel State Event UP : " + se.getState().toString());// +"\t"+ se.getValue().toString());
             if (se.getState()==ChannelState.OPEN && se.getValue()!=null){
                 if (se.getValue()==Boolean.TRUE){
                     System.out.println("CONNECTION OPEN ATTEMPT EVENT --------------------");
@@ -167,7 +172,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler
         if (e instanceof MessageEvent) {
             
             MessageEvent me=(MessageEvent) e;
-            System.out.println("RES: " + me.toString());
+            if (debug) System.out.println("RES: " + me.toString());
 //            System.out.println("remote address: " + me.getRemoteAddress());
             Object message=me.getMessage();
             connId=me.getChannel().getId();
