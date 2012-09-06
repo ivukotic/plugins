@@ -1,30 +1,25 @@
 package edu.uchicago.xrootd4j;
 
-import java.util.Map;
-import java.net.InetSocketAddress;
-import java.security.GeneralSecurityException;
-import javax.security.auth.Subject;
-
-import org.dcache.xrootd.protocol.XrootdProtocol;
-import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
-import org.dcache.xrootd.plugins.AuthorizationHandler;
-
-import nl.uva.vlet.glite.lfc.LFCServer;
-import nl.uva.vlet.glite.lfc.LFCConfig;
-import nl.uva.vlet.glite.lfc.internal.FileDesc;
-import nl.uva.vlet.glite.lfc.internal.ReplicaDesc;
-import org.globus.gsi.GlobusCredential;
-
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.Formatter;
-import java.util.Locale;
-
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.InetSocketAddress;
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.GeneralSecurityException;
+import java.util.ArrayList;
+import java.util.Map;
+
+import javax.security.auth.Subject;
+
+import nl.uva.vlet.glite.lfc.LFCConfig;
+import nl.uva.vlet.glite.lfc.LFCServer;
+import nl.uva.vlet.glite.lfc.internal.FileDesc;
+import nl.uva.vlet.glite.lfc.internal.ReplicaDesc;
+
+import org.dcache.xrootd.plugins.AuthorizationHandler;
+import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
 
 public class AtlasAuthorizationHandler implements AuthorizationHandler
 {
@@ -64,7 +59,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
         }
         
         String sLFN="lfn://grid" + LFN;
-        LFN = "lfn://" + System.getenv("LFC_HOST") + "//grid" + LFN;
+        LFN = "lfn://" + LFC_HOST+ "//grid" + LFN;
         
         System.out.println("GOT to translate: " + LFN);
         
@@ -134,6 +129,10 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
                                 if (replica.getHost().equals(SRM_HOST)) {
                                     System.out.println("replica found \n "+ replica.toString());
                                     int li=line.lastIndexOf("=")+1;
+                                    if (li<1) {
+                                    	System.out.println("could not find = sign. looking for /pnfs");
+                                    	li=line.indexOf("/pnfs/");
+                                    }
                                     PFN=line.substring(li);
                                     System.out.println("PFN: " + PFN);
                                     return PFN;
@@ -155,6 +154,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
             System.out.println("Trying to use lcg-lr " + sLFN);
             ProcessBuilder pb = new ProcessBuilder("lcg-lr", sLFN, "--connect-timeout","10");
             Map<String, String> env = pb.environment();
+            env.put("LFC_HOST", LFC_HOST);
             try{
                 Process p = pb.start();
                 InputStream is = p.getInputStream();
