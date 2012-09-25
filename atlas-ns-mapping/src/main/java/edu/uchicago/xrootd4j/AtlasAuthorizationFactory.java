@@ -67,7 +67,7 @@ public class AtlasAuthorizationFactory implements AuthorizationFactory
             throw new Exception("Couldn't find valid proxy");
 
         if (cred.getTimeLeft() <= 0)
-            throw new Exception("Expiried Credential detected.");
+            throw new Exception("Expired Credential detected.");
 
         System.out.println("proxy timeleft=" + cred.getTimeLeft());
 
