@@ -14,7 +14,7 @@ server available from http://github.com/gbehrmann/xrootd4j:
     java -Dlog=debug 
          -jar /path/to/xrootd4j/xrootd4j-standalone-1.0.1-jar-with-dependencies.jar \
          --plugins target/atlas-ns-mapping-2.0-SNAPSHOT/ \
-         --authz atlas-name-to-name-plugin
+         --handler authn:none,authz:atlas-name-to-name-plugin
 
 Using the plugin with dCache
 ----------------------------
@@ -28,6 +28,6 @@ To enable the plugin, define the following property in dcache.conf:
 
 that way is now deprecated. Proper way is:
 
-	xrootd/xrootdPlugins=authn:none,authz:atlas-name-to-name-plugin
-	pool/xrootdPlugins=
+    xrootd/xrootdPlugins=authn:none,authz:atlas-name-to-name-plugin
+    pool/xrootdPlugins=
 

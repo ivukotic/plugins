@@ -25,12 +25,12 @@ To use this plugin with dCache, place the directory containing this
 file in /usr/local/share/dcache/plugins/
 
 To enable only this plugin, define the following property in dcache.conf:
-	xrootd/xrootdPlugins=authn:none,authz:none,edu.uchicago.monitor
-	pool/xrootdPlugins=
+    xrootd/xrootdPlugins=authn:none,authz:none,edu.uchicago.monitor
+    pool/xrootdPlugins=
 	
     sitename=TEST.uc 
-	hostname=CollectorHost
-	port=CollectorPort
-	delay=30
+    hostname=CollectorHost
+    port=CollectorPort
+    delay=30
 
 

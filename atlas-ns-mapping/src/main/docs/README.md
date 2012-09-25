@@ -3,21 +3,18 @@ Authorization and mapping plugin for xrootd4j and dCache
 
 This is an authorization and mapping plugin for xrootd4j and dCache.
 
-Using the plugin with the standalone server
--------------------------------------------
+To compile the plugin, run:
 
-To use the plugin with the standalone server of xrootd4j, download the
-standalone server from http://github.com/gbehrmann/xrootd4j and start
-it with something like:
+    mvn package
+
+
+The plugin can be tested by loading it with the xrootd4j standalone
+server available from http://github.com/gbehrmann/xrootd4j:
 
     java -Dlog=debug 
          -jar /path/to/xrootd4j/xrootd4j-standalone-1.0.1-jar-with-dependencies.jar \
-         --plugins /path/to/plugins/ \
-         --authz edu.uchicago.xrootd4j
-
-where /path/to/plugins is the directory containing the directory
-containing this file.
-
+         --plugins target/atlas-ns-mapping-2.0-SNAPSHOT/ \
+         --handler authn:none,authz:atlas-name-to-name-plugin
 
 Using the plugin with dCache
 ----------------------------
@@ -27,4 +24,10 @@ file in /usr/local/share/dcache/plugins/
 
 To enable the plugin, define the following property in dcache.conf:
 
-    xrootdAuthzPlugin=edu.uchicago.xrootd4j
+    xrootdAuthzPlugin=atlas-name-to-name-plugin 
+
+that way is now deprecated. Proper way is:
+
+    xrootd/xrootdPlugins=authn:none,authz:atlas-name-to-name-plugin
+    pool/xrootdPlugins=
+
