@@ -11,7 +11,7 @@ To compile the plugin, run:
 The plugin can be tested by loading it with the xrootd4j standalone
 server available from http://github.com/gbehrmann/xrootd4j:
 
-    java -Dlog=debug 
+    java -Dlog=debug -Dlfc_host=myLFChost -Dsrm_host=mySRMhost
          -jar /path/to/xrootd4j/xrootd4j-standalone-1.0.1-jar-with-dependencies.jar \
          --plugins target/atlas-ns-mapping-2.0-SNAPSHOT/ \
          --handler authn:none,authz:atlas-name-to-name-plugin
@@ -31,3 +31,6 @@ that way is now deprecated. Proper way is:
     xrootd/xrootdPlugins=authn:none,authz:atlas-name-to-name-plugin
     pool/xrootdPlugins=
 
+you also need to add these two lines into dcache.conf:
+    lfc_host=myLFChost
+    srm_host=mySRMhost

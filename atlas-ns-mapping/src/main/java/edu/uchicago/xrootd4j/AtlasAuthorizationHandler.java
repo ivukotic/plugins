@@ -102,13 +102,17 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
                     try{
                             entry = lfcServer.fetchFileDesc(lfcUri.getPath());
                     }catch(Exception e){
-                            e.printStackTrace();
-                            System.err.println("*** Error: Can't get file description.");
-                            return "";
+//                            e.printStackTrace();
+                            System.err.println("*** Can't get file description for entry: " + lfcUri.getPath());
+                    }
+                    
+                    if (entry.getGuid()==null){
+                    	System.out.println("maybe got container and not dataset. Trying that...");
+                    	entry = ifInputIsContainerDS(lfcUri.getPath(), lfcServer);
                     }
 
                     if (!entry.isFile()) {
-                            System.err.println("*** Error: Not a file.");
+                            System.err.println("*** Error: No such file or not a file.");
                             return "";
                     }
                     guid=entry.getGuid();
@@ -192,4 +196,42 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
     }
     
     
+    public FileDesc ifInputIsContainerDS(String path, LFCServer lfcServer){
+    	FileDesc entry=new FileDesc();
+        System.out.println("path -> "+path);
+        path=path.replaceAll("\\b//\\b","/");
+        System.out.println("stripped path -> "+path);
+        
+        int li=path.lastIndexOf("/");
+        String fn=path.substring(li+1);
+        System.out.println("filename -> "+fn);
+        
+        path=path.substring(0,li); // no filename
+        li=path.lastIndexOf("/");
+        String DSname= path.substring(li+1);
+        System.out.println("dsname -> "+DSname);
+        String dirname=path.substring(0,li);
+        System.out.println("dir -> "+dirname);
+        
+        try{
+        	ArrayList<FileDesc> dirsdescs= lfcServer.listDirectory(dirname);
+        	System.out.println("got list of "+dirsdescs.size()+ " data sets in this container.");
+        	for (FileDesc dirdesc : dirsdescs){
+        		System.out.println(dirdesc.getFileName());
+        		if (dirdesc.getFileName().indexOf(DSname)!=-1){
+        			String newFN=dirname+"/"+dirdesc.getFileName()+"/"+fn;
+        			System.out.println("found matching DS! trying: "+newFN);
+                    try{
+                    	return lfcServer.fetchFileDesc(newFN);
+                    }catch(Exception e){
+                        System.err.println("*** Not this one.");
+                    }
+        		}
+        	}
+        }catch(Exception e1){
+            System.err.println("***  There is no dataset container named: " + dirname);
+            return entry;
+        }
+    	return entry;
+    }
 }

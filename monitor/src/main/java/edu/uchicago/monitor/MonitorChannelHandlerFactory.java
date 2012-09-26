@@ -20,7 +20,8 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
     }
 
     public MonitorChannelHandlerFactory(Properties properties)
-    {	String site=properties.getProperty("sitename");
+    {	
+    	String site=properties.getProperty("sitename");
 		String host=properties.getProperty("hostname");
 		String sport=properties.getProperty("port");
 		String sdelay=properties.getProperty("delay");

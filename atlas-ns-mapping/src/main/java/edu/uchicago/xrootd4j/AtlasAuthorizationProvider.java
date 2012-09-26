@@ -12,7 +12,7 @@ public class AtlasAuthorizationProvider implements AuthorizationProvider
         createFactory(String plugin, Properties properties)
     {
         if (AtlasAuthorizationFactory.hasName(plugin)) {
-            return new AtlasAuthorizationFactory();
+            return new AtlasAuthorizationFactory(properties);
         }
         return null;
     }
