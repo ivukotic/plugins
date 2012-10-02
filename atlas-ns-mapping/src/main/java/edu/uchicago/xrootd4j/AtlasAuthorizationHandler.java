@@ -10,6 +10,7 @@ import java.net.URISyntaxException;
 import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Properties;
 
 import javax.security.auth.Subject;
 
@@ -20,6 +21,8 @@ import nl.uva.vlet.glite.lfc.internal.ReplicaDesc;
 
 import org.dcache.xrootd.plugins.AuthorizationHandler;
 import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
+import org.globus.gsi.GlobusCredential;
+import org.globus.gsi.GlobusCredentialException;
 
 public class AtlasAuthorizationHandler implements AuthorizationHandler
 {
@@ -29,12 +32,80 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
     private LFCConfig config = null; 
     private String LFC_HOST="";
     private String SRM_HOST="";
+
+    String proxyFile = null;
     
-    public AtlasAuthorizationHandler(String LH, String SH, LFCConfig conf){
-        LFC_HOST=LH;
-        SRM_HOST=SH;        
-        config=conf;
+    public AtlasAuthorizationHandler(Properties properties){
+    	LFC_HOST=properties.getProperty("lfc_host");
+		SRM_HOST=properties.getProperty("srm_host");
+    	
+    	if (LFC_HOST==null){
+            System.err.println("*** Error: LFC_HOST parameter not defined. Please set it (in etc/dcache.conf) and restart the server.");
+            System.exit(1);
+        }else {
+            System.out.println("Setting LFC_HOST to: "+LFC_HOST);
+        }
+        
+        if (SRM_HOST==null){
+            System.err.println("*** Error: SRM_HOST parameter not defined. Please set it (in etc/dcache.conf)  and restart the server.");
+            System.exit(1);
+        }else {
+            System.out.println("Setting SRM_HOST to: "+SRM_HOST);
+        }     
+        try{
+            System.out.println("trying to get proxy...");
+            config = new LFCConfig();
+            config.globusCredential = getValidProxy();
+        }catch (Exception e){
+            e.printStackTrace();
+            System.err.println("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access.");
+            config=null;
+        }
     }
+    
+
+    public GlobusCredential getValidProxy() {
+        GlobusCredential cred = null;
+
+        // custom proxy
+        if (proxyFile != null){
+            System.out.println("Using proxy from:" + proxyFile);
+            try{
+            	cred = new GlobusCredential(proxyFile);
+            }catch(GlobusCredentialException e){
+            	System.err.println("*** Error: problem when getting credential from file: " + proxyFile);
+				e.printStackTrace();
+                System.exit(1);
+            }
+        }
+        else{
+            System.out.println("Using default proxy file.");
+            try {
+				cred = GlobusCredential.getDefaultCredential();
+			} catch (GlobusCredentialException e) {
+            	System.err.println("*** Error: problem when getting credential from file: " + proxyFile);
+				e.printStackTrace();
+                System.exit(1);
+			}
+        }
+
+        if (cred == null){
+            System.err.println("Couldn't find valid proxy");
+        	System.exit(1);
+    	}
+        
+        if (cred.getTimeLeft() <= 0){
+            System.err.println("Expired Credential detected.");
+        	System.exit(1);
+    	}
+
+        System.out.println("proxy timeleft=" + cred.getTimeLeft());
+
+        return cred;
+    }
+
+
+    
     
     @Override
     public String authorize(Subject subject,
@@ -57,6 +128,8 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler
                 System.err.println("*** Error: LFN must start with /atlas/. ");
                 return "";
         }
+        
+        if (config.globusCredential.getTimeLeft() <= 60) getValidProxy();
         
         String sLFN="lfn://grid" + LFN;
         LFN = "lfn://" + LFC_HOST+ "//grid" + LFN;
