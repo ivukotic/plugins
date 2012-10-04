@@ -25,7 +25,6 @@ import org.jboss.netty.channel.WriteCompletionEvent;
 public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
-	private final Map<Integer, FileStatistics> descriptors = new HashMap<Integer, FileStatistics>();
 	private final UUID connectionId = UUID.randomUUID();
 	private int connId = 0;
 	private long duration;
@@ -50,7 +49,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			if (message instanceof ReadRequest) {
 				ReadRequest rr = (ReadRequest) message;
-				FileStatistics fs = descriptors.get(rr.getFileHandle());
+				FileStatistics fs = collector.fmap.get(rr.getFileHandle());
 				fs.bytesRead.getAndAdd(rr.bytesToRead());
 				fs.reads.getAndIncrement();
 				collector.totBytesRead.getAndAdd(rr.bytesToRead());
@@ -73,7 +72,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				}
 				int totVread = 0;
 				for (Map.Entry<Integer, Integer> entry : fts.entrySet()) {
-					FileStatistics fs = descriptors.get(entry.getKey());
+					FileStatistics fs = collector.fmap.get(entry.getKey());
 					if (fs != null) {
 						fs.bytesRead.getAndAdd(entry.getValue());
 						fs.reads.getAndIncrement();
@@ -110,15 +109,15 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				FileStatistics fs = new FileStatistics();
 				fs.filename = or.getPath();
 				fs.mode = mode;
-				descriptors.put(or.getStreamId(), fs);
+				collector.fmap.put(or.getStreamId(), fs);
 				System.out.println("------------------------------------");
 			} else if (message instanceof CloseRequest) {
 				CloseRequest cr = (CloseRequest) message;
 				System.out.println("FILE CLOSE EVENT --------------------");
 				System.out.println("connUUID:   " + connectionId.toString());
 				System.out.println("connId:     " + connId);
-				collector.closeEvent(connectionId, descriptors.get(cr.getFileHandle()));
-				descriptors.remove(cr.getFileHandle());
+				collector.closeEvent(connectionId, collector.fmap.get(cr.getFileHandle()));
+				collector.fmap.remove(cr.getFileHandle());
 				System.out.println("------------------------------------");
 			}
 
@@ -211,13 +210,13 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// OR.getFileStatus().getId());
 				// System.out.println("filestatus: "+
 				// OR.getFileStatus().toString());
-				FileStatistics fs = descriptors.get(streamID);
+				FileStatistics fs = collector.fmap.get(streamID);
 				if (fs == null) {
 					System.err.println("Serious problem: can not find file with handle " + streamID);
 				}
 				fs.filesize = OR.getFileStatus().getSize();
-				descriptors.put(OR.getFileHandle(), fs);
-				descriptors.remove(streamID);
+				collector.fmap.put(OR.getFileHandle(), fs);
+				collector.fmap.remove(streamID);
 				collector.openEvent(connectionId, fs);
 				System.out.println("-----------------------------------------------");
 			} else if (message instanceof AbstractResponseMessage) {

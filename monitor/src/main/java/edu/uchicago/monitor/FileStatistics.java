@@ -10,6 +10,7 @@ class FileStatistics
 	public String filename="";
 	public int mode=-1;
     public final AtomicLong bytesWritten = new AtomicLong();
+    public final AtomicLong bytesVectorRead = new AtomicLong();
     public final AtomicLong bytesRead = new AtomicLong();
     public final AtomicLong reads = new AtomicLong();
     public final AtomicLong vectorReads = new AtomicLong();
@@ -21,8 +22,9 @@ class FileStatistics
     	res+="\nfileId:\t"+fileId.toString();
     	res+="\nmode:\t"+mode;
     	res+="\nsize:\t"+filesize;
-    	res+="\nwrite:\t"+bytesWritten+" bytes";
-    	res+="\nread:\t"+bytesRead+" bytes";
+    	res+="\nbytes written:\t"+bytesWritten+" bytes";
+    	res+="\nbytes read:\t"+bytesRead+" bytes";
+    	res+="\nbytes vector read:\t"+bytesVectorRead;
     	res+="\nreads:\t"+reads;
     	res+="\nVreads:\t"+vectorReads;
     	res+="\nwrites:\t"+writes;
