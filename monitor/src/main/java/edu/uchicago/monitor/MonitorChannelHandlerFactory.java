@@ -2,7 +2,6 @@ package edu.uchicago.monitor;
 
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.Properties;
 import java.util.Set;
 
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
@@ -12,6 +11,7 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
 {
     final static String NAME = "edu.uchicago.monitor";    
     final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
+    
     private Collector collector;
     
     static boolean hasName(String name)
@@ -19,22 +19,9 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
         return ALTERNATIVE_NAMES.contains(name);
     }
 
-    public MonitorChannelHandlerFactory(Properties properties)
+    public MonitorChannelHandlerFactory()
     {	
-    	String site=properties.getProperty("sitename");
-		String host=properties.getProperty("hostname");
-		String sport=properties.getProperty("port");
-		String sdelay=properties.getProperty("delay");
-    	System.out.println("sitename: "+site);
-    	System.out.println("hostname: "+host);
-    	System.out.println("port: "+sport);
-    	System.out.println("delay: "+sdelay);
-    	if(site==null||host==null||sport==null){
-    		System.err.println("Monitor not intialized properly. Exiting.");
-    		System.exit(1);
-    	}
-    	if (sdelay==null) sdelay="60";
-        collector = new Collector(site, host, Integer.parseInt(sport), Integer.parseInt(sdelay));
+    	collector = new Collector();
     }
 
     @Override
@@ -52,6 +39,6 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
     @Override
     public ChannelHandler createHandler()
     {
-        return new MonitorChannelHandler(collector);
+        return new MonitorChannelHandler( collector );
     }
 }

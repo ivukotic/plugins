@@ -11,12 +11,18 @@ To compile the plugin, run:
 The plugin can be tested by loading it with the xrootd4j standalone
 server available from http://github.com/gbehrmann/xrootd4j:
 
-    java -Dlog=debug -Dsitename=TEST.uc -Dhostname=CollectorHost -Dport=CollectorPort -Ddelay=30 
+    java -Dlog=debug  \
+		 -Dsitename=TEST.uc \
+		 -Dsummary=test.stanford.edu:9931:60,localhost:9931:17 \
+		 -Ddetailed=localhost:9930:13
          -jar /path/to/xrootd4j/xrootd4j-standalone-1.1.0-jar-with-dependencies.jar \
          --plugins target/monitor-1.0-SNAPSHOT/ \
          --handler authn:none,edu.uchicago.monitor
 
-replace CollectorHost and CollectorPort with proper values.
+You may select several destinations to send collected information to. Each destination is given in form:
+<hostname>:<port>[:<interval>]
+Interval signifies wait period in seconds between two consecutive sendings of information to that server.
+Replace values given with the real ones.
 
 Using the plugin with dCache
 ----------------------------
@@ -28,9 +34,6 @@ To enable only this plugin, define the following property in dcache.conf:
     xrootd/xrootdPlugins=authn:none,authz:none,edu.uchicago.monitor
     pool/xrootdPlugins=
 	
-    sitename=TEST.uc 
-    hostname=CollectorHost
-    port=CollectorPort
-    delay=30
-
+    summary=atl-prod05.slac.stanford.edu:9931:60,localhost:9931:17
+	detailed=localhost:9930:13
 

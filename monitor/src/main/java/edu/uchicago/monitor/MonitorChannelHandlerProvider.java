@@ -11,7 +11,7 @@ public class MonitorChannelHandlerProvider implements ChannelHandlerProvider
     public ChannelHandlerFactory createFactory(String plugin, Properties properties)
     {
         if (MonitorChannelHandlerFactory.hasName(plugin)) {
-            return new MonitorChannelHandlerFactory(properties);
+            return new MonitorChannelHandlerFactory();
         }
         return null;
     }
