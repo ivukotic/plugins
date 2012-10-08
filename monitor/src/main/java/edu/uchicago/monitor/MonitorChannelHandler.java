@@ -116,8 +116,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				System.out.println("FILE CLOSE EVENT --------------------");
 				System.out.println("connUUID:   " + connectionId.toString());
 				System.out.println("connId:     " + connId);
-				collector.closeEvent(connectionId, collector.fmap.get(cr.getFileHandle()));
-				collector.fmap.remove(cr.getFileHandle());
+				collector.closeEvent(connectionId, cr.getFileHandle());
 				System.out.println("------------------------------------");
 			}
 

@@ -15,6 +15,7 @@ class FileStatistics
     public final AtomicLong reads = new AtomicLong();
     public final AtomicLong vectorReads = new AtomicLong();
     public final AtomicLong writes = new AtomicLong();
+    public int state=0; //bit 1- report on opening, bit 2 - report transfer, 3-report file as closed and close it. 
     
     @Override
     public String toString(){
