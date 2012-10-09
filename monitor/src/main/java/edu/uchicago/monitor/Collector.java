@@ -34,7 +34,8 @@ import org.jboss.netty.util.CharsetUtil;
 public class Collector {
 
 	private final String sitename;
-
+	private Properties properties;
+	
 	private int tos;
 	private int pid;
 	private byte fseq;
@@ -53,15 +54,17 @@ public class Collector {
 	private CollectorAddresses ca = new CollectorAddresses();
 	Timer timer = new Timer();
 
-	Collector() {
-		Properties properties = System.getProperties();
+	Collector(Properties properties) {
+		this.properties=properties;
 		sitename = properties.getProperty("sitename");
 		System.out.println("sitename: " + sitename);
 		init();
 	}
 
 	private void init() {
+		ca.init(properties);
 		System.out.println(ca.toString());
+		
 		tos = (int) (System.currentTimeMillis() / 1000L);
 
 		try {

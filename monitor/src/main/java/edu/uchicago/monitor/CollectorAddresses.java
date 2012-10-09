@@ -11,7 +11,9 @@ public class CollectorAddresses {
 	public boolean reportDetailed = false;
 
 	CollectorAddresses() {
-		Properties properties = System.getProperties();
+	}
+	
+	public void init(Properties properties){
 
 		String pSummary = properties.getProperty("summary");
 		if (pSummary != null) {
@@ -47,9 +49,8 @@ public class CollectorAddresses {
 			System.err.println(" *** ERR: no addresses given to send monitoring info. Please provide addresses or turn off monitoring.");
 			System.exit(3);
 		}
-
 	}
-
+	
 	@Override
 	public String toString() {
 		String res = "";

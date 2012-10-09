@@ -2,6 +2,7 @@ package edu.uchicago.monitor;
 
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Properties;
 import java.util.Set;
 
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
@@ -19,9 +20,9 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
         return ALTERNATIVE_NAMES.contains(name);
     }
 
-    public MonitorChannelHandlerFactory()
+    public MonitorChannelHandlerFactory(Properties properties)
     {	
-    	collector = new Collector();
+    	collector = new Collector(properties);
     }
 
     @Override
