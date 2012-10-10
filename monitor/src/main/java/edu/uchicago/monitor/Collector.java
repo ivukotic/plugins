@@ -3,6 +3,7 @@ package edu.uchicago.monitor;
 import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.net.UnknownHostException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -33,9 +34,9 @@ import org.jboss.netty.util.CharsetUtil;
 
 public class Collector {
 
-	private final String sitename;
+	private String servername;
 	private Properties properties;
-	
+
 	private int tos;
 	private int pid;
 	private byte fseq;
@@ -55,16 +56,29 @@ public class Collector {
 	Timer timer = new Timer();
 
 	Collector(Properties properties) {
-		this.properties=properties;
-		sitename = properties.getProperty("sitename");
-		System.out.println("sitename: " + sitename);
+		this.properties = properties;
 		init();
 	}
 
 	private void init() {
+		
+		String pServerName = properties.getProperty("servername"); // if not defined will try to get it using getHostName.
+		if (pServerName != null) {
+			servername = pServerName;
+		} else {
+			try {
+				servername = java.net.InetAddress.getLocalHost().getHostName();
+				System.out.println("server name: " + servername);
+			} catch (UnknownHostException e) {
+				System.out.println("Could not get server's hostname. Will set it to xxx.abc.def");
+				servername = "xxx.abc.def";
+				e.printStackTrace();
+			}
+		}
+		
 		ca.init(properties);
 		System.out.println(ca.toString());
-		
+
 		tos = (int) (System.currentTimeMillis() / 1000L);
 
 		try {
@@ -139,7 +153,7 @@ public class Collector {
 
 		SendSummaryStatisticsTask(Address a) {
 			this.a = a;
-			info = "<stats id=\"info\"><host>xxx." + sitename + "</host><port>" + a.port + "</port><name>anon</name></stats>";
+			info = "<stats id=\"info\"><host>" + servername + "</host><port>" + a.port + "</port><name>anon</name></stats>";
 		}
 
 		public void run() {
@@ -147,7 +161,7 @@ public class Collector {
 			String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
 			String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" + totBytesWriten.toString() + "</in><out>" + totBytesRead.toString()
 					+ "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
-			String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"xxx." + sitename
+			String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
 					+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
 			// System.out.println(xmlmessage);
 
@@ -164,32 +178,17 @@ public class Collector {
 		// private String info;
 		SendDetailedStatisticsTask(Address a) {
 			this.a = a;
-			// info = "<stats id=\"info\"><host>xxx." + sitename +
-			// "</host><port>" + a.port + "</port><name>anon</name></stats>";
 		}
 
 		public void run() {
 			sendFstream();
-			// long tod = System.currentTimeMillis() / 1000L - 60;
-			// String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>"
-			// + (tod + 60) + "</toe></stats>";
-			// String link =
-			// "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>"
-			// + totBytesWriten.toString() + "</in><out>" +
-			// totBytesRead.toString()
-			// +
-			// "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
-			// String xmlmessage = "<statistics tod=\"" + tod +
-			// "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"xxx." + sitename
-			// + "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info +
-			// sgen + link + "</statistics>";
-			// // System.out.println(xmlmessage);
 		}
 
 		private void sendFstream() {
 			System.out.println("sending detailed stream");
 			DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
-			short plen = (short) (24+32*fmap.size()); // this is length of 3 mandatory headers
+			short plen = (short) (24 + 32 * fmap.size()); // this is length of 3
+															// mandatory headers
 			ChannelBuffer db = dynamicBuffer(plen);
 
 			// main header
@@ -215,8 +214,8 @@ public class Collector {
 					db.writeByte((byte) 1); // 1 - means isOpen
 					db.writeByte((byte) 0x01); // the lfn is present - 0x02 is
 												// R/W
-					int len=21+fs.filename.length();
-					plen+=21+fs.filename.length();
+					int len = 21 + fs.filename.length();
+					plen += 21 + fs.filename.length();
 					db.writeShort(len); // size
 					db.writeInt(tos); // unix time
 
@@ -245,11 +244,12 @@ public class Collector {
 				if ((fs.state & 0x0004) > 0) { // add fileclose structure
 					// header
 					db.writeByte((byte) 0); // 0 - means isClose
-					db.writeByte((byte) 0x00); // 0- basic 2- MonStatXFR + MonStatOPS 1-
+					db.writeByte((byte) 0x00); // 0- basic 2- MonStatXFR +
+												// MonStatOPS 1-
 												// close due to disconnect 4-
 												// XFR + OPS + MonStatSDV
 					db.writeShort(8 + 24); // size of this header
-					plen+=32;
+					plen += 32;
 					db.writeInt(tos); // unix time
 
 					//
@@ -273,8 +273,8 @@ public class Collector {
 			db.writeShort(8);
 			db.writeInt(tos);
 
-			db.setShort(2,plen);
-			
+			db.setShort(2, plen);
+
 			c.write(db, new InetSocketAddress(a.address, a.port));
 		}
 

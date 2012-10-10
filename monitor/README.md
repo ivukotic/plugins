@@ -31,9 +31,13 @@ To use this plugin with dCache, place the directory containing this
 file in /usr/local/share/dcache/plugins/
 
 To enable only this plugin, define the following property in dcache.conf:
-    xrootd/xrootdPlugins=authn:none,authz:none,edu.uchicago.monitor
-    pool/xrootdPlugins=
+    xrootd/ xrootdPlugins=authn:none,authz:none,edu.uchicago.monitor
+    pool/   xrootdPlugins=
 	
     summary=atl-prod05.slac.stanford.edu:9931:60,localhost:9931:17
 	detailed=localhost:9930:13
+
+If your server is behind NAT, you should also define property servername in a form:
+	servername=myserver.mydomain.org
+
 
