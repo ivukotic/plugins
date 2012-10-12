@@ -13,29 +13,30 @@ import org.dcache.xrootd.protocol.messages.OpenRequest;
 import org.dcache.xrootd.protocol.messages.OpenResponse;
 import org.dcache.xrootd.protocol.messages.ReadRequest;
 import org.dcache.xrootd.protocol.messages.ReadVRequest;
+import org.dcache.xrootd.protocol.messages.WriteRequest;
 import org.dcache.xrootd.protocol.messages.XrootdRequest;
 import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelState;
 import org.jboss.netty.channel.ChannelStateEvent;
+import org.jboss.netty.channel.DefaultExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.WriteCompletionEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class MonitorChannelHandler extends SimpleChannelHandler {
+
+	final Logger logger = LoggerFactory.getLogger(MonitorChannelHandler.class);
 
 	private final Collector collector;
 	private final UUID connectionId = UUID.randomUUID();
 	private int connId = 0;
 	private long duration;
-	private boolean debug = false;
 
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
-		if (System.getProperties().getProperty("log") == "debug") {
-			debug = true;
-			System.out.println("turning ON debug printouts.");
-		}
 	}
 
 	@Override
@@ -43,8 +44,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		if (e instanceof MessageEvent) {
 
 			MessageEvent me = (MessageEvent) e;
-			if (debug)
-				System.out.println("REQ: " + me.toString());
+			logger.debug("REQ: " + me.toString());
 			Object message = me.getMessage();
 
 			if (message instanceof ReadRequest) {
@@ -53,11 +53,9 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				fs.bytesRead.getAndAdd(rr.bytesToRead());
 				fs.reads.getAndIncrement();
 				collector.totBytesRead.getAndAdd(rr.bytesToRead());
-			}
+			} 
 
-			else
-
-			if (message instanceof ReadVRequest) {
+			else if (message instanceof ReadVRequest) {
 				ReadVRequest rr = (ReadVRequest) message;
 				EmbeddedReadRequest[] err = rr.getReadRequestList();
 				Map<Integer, Integer> fts = new HashMap<Integer, Integer>();
@@ -80,20 +78,19 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					}
 				}
 				collector.totBytesRead.getAndAdd(totVread);
-			}
+			} 
 
-			else
-
-			if (message instanceof LoginRequest) {
+			else if (message instanceof LoginRequest) {
 				LoginRequest lr = (LoginRequest) message;
 				int protocol = lr.getClientProtocolVersion();
-				System.out.println("login request: client protocol" + protocol);
-			}
+				logger.info("login request: client protocol" + protocol);
+			} 
 
 			// from OpenRequest we get:
 			// mode (true -> readonly, false -> new, append, update, open
 			// deleting existing)
 			// filename
+
 			else if (message instanceof OpenRequest) {
 				OpenRequest or = (OpenRequest) message;
 				int mode = 1;
@@ -101,56 +98,78 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					mode = 1;
 				else
 					mode = 0; // not correct
-				System.out.println("FILE OPEN EVENT -------------------- stream Id: " + or.getStreamId());
-				System.out.println("connUUID:   " + connectionId.toString());
-				System.out.println("connId:     " + connId);
-				System.out.println("path:     " + or.getPath());
-				System.out.println("readonly: " + mode);
+				logger.info("FILE OPEN EVENT -------------------- stream Id: " + or.getStreamId());
+				logger.info("connUUID:   " + connectionId.toString());
+				logger.info("connId:     " + connId);
+				logger.info("path:     " + or.getPath());
+				logger.info("readonly: " + mode);
 				FileStatistics fs = new FileStatistics();
 				fs.filename = or.getPath();
 				fs.mode = mode;
 				collector.fmap.put(or.getStreamId(), fs);
-				System.out.println("------------------------------------");
-			} else if (message instanceof CloseRequest) {
+				logger.info("------------------------------------");
+			} 
+
+			else if (message instanceof CloseRequest) {
 				CloseRequest cr = (CloseRequest) message;
-				System.out.println("FILE CLOSE EVENT --------------------");
-				System.out.println("connUUID:   " + connectionId.toString());
-				System.out.println("connId:     " + connId);
+				logger.info("FILE CLOSE EVENT --------------------");
+				logger.info("connUUID:   " + connectionId.toString());
+				logger.info("connId:     " + connId);
 				collector.closeEvent(connectionId, cr.getFileHandle());
-				System.out.println("------------------------------------");
-			}
+				logger.info("------------------------------------");
+			} 
+
+			else if (message instanceof WriteRequest) {
+				WriteRequest wr = (WriteRequest) message;
+				FileStatistics fs = collector.fmap.get(wr.getFileHandle());
+				fs.bytesWritten.getAndAdd(wr.getDataLength());
+				fs.writes.getAndIncrement();
+				collector.totBytesWriten.getAndAdd(wr.getDataLength());
+			} 
 
 			else if (message instanceof XrootdRequest) {
 				XrootdRequest req = (XrootdRequest) message;
-				System.out.println("I-> streamID: " + req.getStreamId() + "\treqID: " + req.getRequestId());
+				logger.info("I-> streamID: " + req.getStreamId() + "\treqID: " + req.getRequestId());
 			}
-		} else if (e instanceof ChannelStateEvent) {
+
+		} 
+
+		else if (e instanceof ChannelStateEvent) {
 			ChannelStateEvent se = (ChannelStateEvent) e;
-			if (debug)
-				System.out.println("Channel State Event UP : " + se.getState().toString());// +"\t"+
-																							// se.getValue().toString());
+			logger.debug("Channel State Event UP : " + se.getState().toString());// +"\t"+
+																					// se.getValue().toString());
 			if (se.getState() == ChannelState.OPEN && se.getValue() != null) {
 				if (se.getValue() == Boolean.TRUE) {
-					System.out.println("CONNECTION OPEN ATTEMPT EVENT --------------------");
+					logger.info("CONNECTION OPEN ATTEMPT EVENT --------------------");
 					collector.addConnectionAttempt();
-					System.out.println("---------------------------------------");
+					logger.info("---------------------------------------");
 				}
-			} else if (se.getState() == ChannelState.CONNECTED && se.getValue() == null) {
-				System.out.println("DISCONNECT EVENT --------------------");
+			} 
+
+			else if (se.getState() == ChannelState.CONNECTED && se.getValue() == null) {
+				logger.info("DISCONNECT EVENT --------------------");
 				duration = System.currentTimeMillis() - duration;
-				System.out.println("connID:             " + connectionId.toString());
-				System.out.println("connId:             " + connId);
-				System.out.println("connection duration:" + duration);
+				logger.info("connID:             " + connectionId.toString());
+				logger.info("connId:             " + connId);
+				logger.info("connection duration:" + duration);
 				collector.disconnectedEvent(connectionId, duration);
-				System.out.println("------------------------------------");
-				System.out.println(collector.toString());
+				logger.info("------------------------------------");
+				logger.info(collector.toString());
 			}
-			// else System.out.println(se.getValue().toString());
-		} else if (e instanceof WriteCompletionEvent) {
-			// System.out.println(" write completed UP");
-		} else {
-			System.out.println("not an up message?" + e.toString());
+			// else logger.info(se.getValue().toString());
+		} 
+
+		else if (e instanceof WriteCompletionEvent) {
+			// logger.info(" write completed UP");
 		}
+
+		else if (e instanceof DefaultExceptionEvent) { // not an instanceof MessageEvent
+			DefaultExceptionEvent dee = (DefaultExceptionEvent) e;
+			logger.error("eXception thrown message " + dee.toString());
+		} else { // not an instanceof MessageEvent or DefaultExceptionEvent
+			logger.info("Monitor not handling this kind of message.");
+		}
+
 		super.handleUpstream(ctx, e);
 	}
 
@@ -159,24 +178,23 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		if (e instanceof MessageEvent) {
 
 			MessageEvent me = (MessageEvent) e;
-			if (debug)
-				System.out.println("RES: " + me.toString());
-			// System.out.println("remote address: " + me.getRemoteAddress());
+			logger.debug("RES: " + me.toString());
+			// logger.info("remote address: " + me.getRemoteAddress());
 			Object message = me.getMessage();
 			connId = me.getChannel().getId();
-			// System.out.println("connId:         " + connId);
-			// System.out.println("message:        " + message.toString());
+			// logger.info("connId:         " + connId);
+			// logger.info("message:        " + message.toString());
 
 			if (message instanceof LoginResponse) {
 				// LoginResponse lr = (LoginResponse) message;
-				// System.out.println("reqID: " +
+				// logger.info("reqID: " +
 				// lr.getRequest().getStreamId());
 				// int [] sessionID= new int[2];
 				// ChannelBuffer ssid = lr.getBuffer();
 				// StringBuffer hexString = new StringBuffer();
-				// System.out.println("buffer:"+ssid.toString("ISO-8859-1"));
+				// logger.info("buffer:"+ssid.toString("ISO-8859-1"));
 				// for (int i=8;i<16;i++) {
-				// System.out.println("byte: "+i+"\t value: "+ssid.getByte(i));
+				// logger.info("byte: "+i+"\t value: "+ssid.getByte(i));
 				// hexString.append(Integer.toHexString(0xFF & ssid.getByte(i)
 				// ));
 				// }
@@ -188,53 +206,62 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// sessionID[j-2] += (ssid.getByte(i) & 0x000000FF) << shift;
 				// }
 				// }
-				// System.out.println("ssid : H  "+hexString);
-				// System.out.println(Arrays.toString(sessionID));
+				// logger.info("ssid : H  "+hexString);
+				// logger.info(Arrays.toString(sessionID));
 
 				duration = System.currentTimeMillis();
-				System.out.println("CONNECT EVENT ----------------------");
-				System.out.println("connUUID:   " + connectionId.toString());
-				System.out.println("connId:     " + connId);
-				System.out.println("host ip:    " + e.getChannel().getRemoteAddress());
+				logger.info("CONNECT EVENT ----------------------");
+				logger.info("connUUID:   " + connectionId.toString());
+				logger.info("connId:     " + connId);
+				logger.info("host ip:    " + e.getChannel().getRemoteAddress());
 				collector.connectedEvent(connectionId, e.getChannel().getRemoteAddress());
-				System.out.println("------------------------------------");
-			} else if (message instanceof OpenResponse) {
+				logger.info("------------------------------------");
+			} 
+
+			else if (message instanceof OpenResponse) {
 				OpenResponse OR = (OpenResponse) message;
 				Integer streamID = OR.getRequest().getStreamId();
-				System.out.println("FILE OPEN RESPONSE ---------------------------- stream Id: " + streamID);
-				System.out.println("filehandle: " + OR.getFileHandle());
-				// System.out.println("filesize  : "+
+				logger.info("FILE OPEN RESPONSE ---------------------------- stream Id: " + streamID);
+				logger.info("filehandle: " + OR.getFileHandle());
+				// logger.info("filesize  : "+
 				// OR.getFileStatus().getSize());
-				// System.out.println("fileid    : "+
+				// logger.info("fileid    : "+
 				// OR.getFileStatus().getId());
-				// System.out.println("filestatus: "+
+				// logger.info("filestatus: "+
 				// OR.getFileStatus().toString());
 				FileStatistics fs = collector.fmap.get(streamID);
 				if (fs == null) {
-					System.err.println("Serious problem: can not find file with handle " + streamID);
+					logger.error("Serious problem: can not find file with handle " + streamID);
 				}
 				fs.filesize = OR.getFileStatus().getSize();
 				collector.fmap.put(OR.getFileHandle(), fs);
 				collector.fmap.remove(streamID);
 				collector.openEvent(connectionId, fs);
-				System.out.println("-----------------------------------------------");
-			} else if (message instanceof AbstractResponseMessage) {
+				logger.info("-----------------------------------------------");
+			} 
+
+			else if (message instanceof AbstractResponseMessage) {
 				// AbstractResponseMessage ARM=(AbstractResponseMessage)
 				// message;
 				// XrootdRequest req = ARM.getRequest();
-				// System.out.println("I-> streamID: "+req.getStreamId()+
+				// logger.info("I-> streamID: "+req.getStreamId()+
 				// "\treqID: "+req.getRequestId());
-				// System.out.println("IB->: "+
+				// logger.info("IB->: "+
 				// (ARM.getBuffer()).toString("UTF-8") ) ;
 
 			}
-		} else if (e instanceof ChannelStateEvent) {
+
+		} 
+
+		else if (e instanceof ChannelStateEvent) {
 			ChannelStateEvent se = (ChannelStateEvent) e;
-			System.out.println("Channel State Event DOWN : " + se.getState().toString() + "\t" + se.getValue().toString());
-		} else if (e instanceof WriteCompletionEvent) {
-			// System.out.println(" write completed DOWN");
+			logger.info("Channel State Event DOWN : " + se.getState().toString() + "\t" + se.getValue().toString());
+		} 
+
+		else if (e instanceof WriteCompletionEvent) {
+			// logger.info(" write completed DOWN");
 		} else {
-			System.out.println("not a down message?" + e.toString());
+			logger.info("Monitor not handling this kind of message.");
 		}
 		super.handleDownstream(ctx, e);
 	}

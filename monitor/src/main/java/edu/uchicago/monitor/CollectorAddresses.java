@@ -3,12 +3,16 @@ package edu.uchicago.monitor;
 import java.util.ArrayList;
 import java.util.Properties;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class CollectorAddresses {
 
 	public ArrayList<Address> summary = new ArrayList<Address>();
 	public ArrayList<Address> detailed = new ArrayList<Address>();
 	public boolean reportSummary = false;
 	public boolean reportDetailed = false;
+	final Logger logger = LoggerFactory.getLogger(CollectorAddresses.class);
 
 	CollectorAddresses() {
 	}
@@ -22,8 +26,8 @@ public class CollectorAddresses {
 				try {
 					summary.add(new Address(tempSummary[i]));
 				} catch (IllegalArgumentException e) {
-					System.err.println(e.getMessage());
-					System.exit(1);
+					logger.warn("could not interpret summary address: "+tempSummary[i]);
+					logger.warn(e.getMessage());
 				}
 			}
 		}
@@ -35,8 +39,8 @@ public class CollectorAddresses {
 				try {
 					detailed.add(new Address(tempDetailed[i]));
 				} catch (IllegalArgumentException e) {
-					System.err.println(e.getMessage());
-					System.exit(1);
+					logger.warn("could not interpret detailed address: "+tempDetailed[i]);
+					logger.warn(e.getMessage());
 				}
 			}
 		}
@@ -46,8 +50,7 @@ public class CollectorAddresses {
 		if (detailed.size() > 0)
 			reportDetailed = true;
 		if (summary.size() == 0 && detailed.size() == 0) {
-			System.err.println(" *** ERR: no addresses given to send monitoring info. Please provide addresses or turn off monitoring.");
-			System.exit(3);
+			logger.warn("No addresses given to send monitoring info. Please provide addresses or turn off monitoring.");
 		}
 	}
 	

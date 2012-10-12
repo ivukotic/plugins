@@ -31,9 +31,13 @@ import org.jboss.netty.channel.socket.nio.NioDatagramChannelFactory;
 import org.jboss.netty.handler.codec.string.StringDecoder;
 import org.jboss.netty.handler.codec.string.StringEncoder;
 import org.jboss.netty.util.CharsetUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class Collector {
 
+	final Logger logger = LoggerFactory.getLogger(Collector.class);
+	
 	private String servername;
 	private Properties properties;
 
@@ -53,7 +57,7 @@ public class Collector {
 	public AtomicLong totBytesWriten = new AtomicLong();
 
 	private CollectorAddresses ca = new CollectorAddresses();
-	Timer timer = new Timer();
+//	Timer timer = new Timer();
 
 	Collector(Properties properties) {
 		this.properties = properties;
@@ -68,23 +72,23 @@ public class Collector {
 		} else {
 			try {
 				servername = java.net.InetAddress.getLocalHost().getHostName();
-				System.out.println("server name: " + servername);
+				logger.info("server name: " + servername);
 			} catch (UnknownHostException e) {
-				System.out.println("Could not get server's hostname. Will set it to xxx.abc.def");
+				logger.error("Could not get server's hostname. Will set it to xxx.abc.def");
 				servername = "xxx.abc.def";
 				e.printStackTrace();
 			}
 		}
 		
 		ca.init(properties);
-		System.out.println(ca.toString());
+		logger.info(ca.toString());
 
 		tos = (int) (System.currentTimeMillis() / 1000L);
 
 		try {
 			pid = Integer.parseInt(new File("/proc/self").getCanonicalFile().getName());
 		} catch (Exception e) {
-			System.err.println("could not get PID from /proc/self. Setting it to 123456.");
+			logger.warn("could not get PID from /proc/self. Setting it to 123456.");
 			pid = 123456;
 		}
 
@@ -98,10 +102,14 @@ public class Collector {
 			}
 		});
 		b.setOption("receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory(1024));
-		for (Address a : ca.summary)
+		for (Address a : ca.summary){
+			Timer timer=new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
-		for (Address a : ca.detailed)
+		}
+		for (Address a : ca.detailed){
+			Timer timer=new Timer();
 			timer.schedule(new SendDetailedStatisticsTask(a), 0, a.delay * 1000);
+		}
 	}
 
 	public void addConnectionAttempt() {
@@ -110,12 +118,12 @@ public class Collector {
 
 	public void openEvent(UUID connectionId, FileStatistics fs) {
 		// Note that status may be null - only available if client requested it
-		System.out.println(">>>Opened " + connectionId + "\n" + fs.toString());
+		logger.info(">>>Opened " + connectionId + "\n" + fs.toString());
 		fs.state |= 0x0011; // set first and second bit
 	}
 
 	public void closeEvent(UUID connectionId, int fh) {
-		System.out.println(">>>Closed " + connectionId + "\n" + fmap.get(fh).toString());
+		logger.info(">>>Closed " + connectionId + "\n" + fmap.get(fh).toString());
 		// if detailed monitoring is ON collector will remove it from map
 		if (ca.reportDetailed == false)
 			fmap.remove(fh);
@@ -125,13 +133,13 @@ public class Collector {
 
 	public void connectedEvent(UUID connectionId, SocketAddress remoteAddress) {
 		currentConnections.getAndIncrement();
-		System.out.println(">>>Connected " + connectionId + " " + remoteAddress);
+		logger.info(">>>Connected " + connectionId + " " + remoteAddress);
 	}
 
 	public void disconnectedEvent(UUID connectionId, long duration) {
 		currentConnections.getAndDecrement();
 		successfulConnections.getAndIncrement();
-		System.out.println(">>>Disconnected " + connectionId + " " + duration + "ms");
+		logger.info(">>>Disconnected " + connectionId + " " + duration + "ms");
 	}
 
 	@Override
@@ -157,13 +165,16 @@ public class Collector {
 		}
 
 		public void run() {
+
+			logger.info("sending summary stream");
+			
 			long tod = System.currentTimeMillis() / 1000L - 60;
 			String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
 			String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" + totBytesWriten.toString() + "</in><out>" + totBytesRead.toString()
 					+ "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
 			String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
 					+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
-			// System.out.println(xmlmessage);
+			// logger.info(xmlmessage);
 
 			DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
 
@@ -185,7 +196,7 @@ public class Collector {
 		}
 
 		private void sendFstream() {
-			System.out.println("sending detailed stream");
+			logger.info("sending detailed stream");
 			DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
 			short plen = (short) (24 + 32 * fmap.size()); // this is length of 3
 															// mandatory headers
@@ -208,16 +219,15 @@ public class Collector {
 				Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
 				FileStatistics fs = (FileStatistics) ent.getValue();
 
-				if ((fs.state & 0x0001) > 0) {
-					// add fileopen structure
+				if ((fs.state & 0x0001) > 0) {  // file OPEN structure
 					// header
 					db.writeByte((byte) 1); // 1 - means isOpen
 					db.writeByte((byte) 0x01); // the lfn is present - 0x02 is
 												// R/W
 					int len = 21 + fs.filename.length();
-					plen += 21 + fs.filename.length();
+					plen += len;
 					db.writeShort(len); // size
-					db.writeInt(tos); // unix time
+					db.writeInt(tos); // replace with dictid  of the file
 
 					db.writeLong(fs.filesize); // filesize at open.
 					if (true) { // check if Filenames should be reported.
@@ -236,7 +246,7 @@ public class Collector {
 				db.writeByte((byte) 3); // fileIO report
 				db.writeByte((byte) 0); // no meaning
 				db.writeShort(32); // 3*longlong + this header itself
-				db.writeInt(ent.getKey()); // fileid
+				db.writeInt(ent.getKey()); // replace with dictid  of the file
 				db.writeLong(fs.bytesRead.get());
 				db.writeLong(fs.bytesVectorRead.get());
 				db.writeLong(fs.bytesWritten.get());
@@ -250,7 +260,7 @@ public class Collector {
 												// XFR + OPS + MonStatSDV
 					db.writeShort(8 + 24); // size of this header
 					plen += 32;
-					db.writeInt(tos); // unix time
+					db.writeInt(tos); // replace with dictid  of the file
 
 					//
 					db.writeLong(fs.bytesRead.get());
