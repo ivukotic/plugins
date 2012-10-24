@@ -61,7 +61,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			config = new LFCConfig();
 			config.globusCredential = getValidProxy();
 		} catch (Exception e) {
-			e.printStackTrace();
+//			e.printStackTrace();
 			logger.warn("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access.");
 			config = null;
 		}
@@ -85,9 +85,9 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			try {
 				cred = GlobusCredential.getDefaultCredential();
 			} catch (GlobusCredentialException e) {
-				logger.error("*** Error: problem when getting default proxy. ");
+				logger.warn("*** Can't get default proxy. ");
 				e.printStackTrace();
-				throw new MissingResourceException("*** Error: problem when getting default proxy.", "GlobusCredential", "");
+				throw new MissingResourceException("*** Can't get default proxy.", "GlobusCredential", "");
 			}
 		}
 
@@ -120,16 +120,16 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			return "";
 		}
 
-		if (config.globusCredential.getTimeLeft() <= 60)
-			getValidProxy();
-
 		String sLFN = "lfn://grid" + LFN;
 		LFN = "lfn://" + LFC_HOST + "//grid" + LFN;
 
 		logger.info("GOT to translate: " + LFN);
 
 		if (config != null) { // access through API
-
+			
+			if (config.globusCredential.getTimeLeft() <= 60)
+				getValidProxy();
+			
 			try {
 				lfcUri = new URI(LFN);
 				logger.info("Is a proper url.");
