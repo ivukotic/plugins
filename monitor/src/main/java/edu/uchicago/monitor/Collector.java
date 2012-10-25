@@ -20,10 +20,11 @@ import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 
 import static org.jboss.netty.buffer.ChannelBuffers.*;
+
+import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.FixedReceiveBufferSizePredictorFactory;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.socket.DatagramChannel;
 import org.jboss.netty.channel.socket.DatagramChannelFactory;
@@ -47,7 +48,9 @@ public class Collector {
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap b;
-
+	
+	
+	
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
@@ -101,7 +104,11 @@ public class Collector {
 						new SimpleChannelUpstreamHandler());
 			}
 		});
-		b.setOption("receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory(1024));
+//		b.setOption("receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory(1024));
+//		b.setOption("sendBufferSize",32000);
+		b.setOption("broadcast", "true");
+		b.setOption("connectTimeoutMillis", 10000);
+		 
 		for (Address a : ca.summary){
 			Timer timer=new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
@@ -178,17 +185,23 @@ public class Collector {
 
 			DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
 
-			c.write(xmlmessage, new InetSocketAddress(a.address, a.port));
-
+			ChannelFuture f =c.write(xmlmessage, new InetSocketAddress(a.address, a.port));
+			
+			f.awaitUninterruptibly();
+			 if (!f.isSuccess()) {
+			     f.getCause().printStackTrace();
+			 } 
+//			 else { logger.info("sent ok"); }
+			c.close();
 		}
 	}
 
 	private class SendDetailedStatisticsTask extends TimerTask {
-		private Address a;
-
+		private InetSocketAddress destination;
+		
 		// private String info;
 		SendDetailedStatisticsTask(Address a) {
-			this.a = a;
+			destination = new InetSocketAddress(a.address, a.port);
 		}
 
 		public void run() {
@@ -201,7 +214,7 @@ public class Collector {
 			short plen = (short) (24 + 32 * fmap.size()); // this is length of 3
 															// mandatory headers
 			ChannelBuffer db = dynamicBuffer(plen);
-
+			
 			// main header
 			db.writeByte((byte) 102); // 'f'
 			db.writeByte((byte) fseq);
@@ -285,7 +298,13 @@ public class Collector {
 
 			db.setShort(2, plen);
 
-			c.write(db, new InetSocketAddress(a.address, a.port));
+			 ChannelFuture f =c.write(db, destination);
+			 f.awaitUninterruptibly();
+			 if (!f.isSuccess()) {
+			     f.getCause().printStackTrace();
+			 } 
+			 // else { logger.info("sent ok");}
+			c.close();
 		}
 
 	}
