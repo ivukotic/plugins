@@ -123,13 +123,13 @@ public class Collector {
 		connectionAttempts.getAndIncrement();
 	}
 
-	public void openEvent(UUID connectionId, FileStatistics fs) {
+	public void openEvent(int connectionId, FileStatistics fs) {
 		// Note that status may be null - only available if client requested it
 		logger.info(">>>Opened " + connectionId + "\n" + fs.toString());
 		fs.state |= 0x0011; // set first and second bit
 	}
 
-	public void closeEvent(UUID connectionId, int fh) {
+	public void closeEvent(int connectionId, int fh) {
 		logger.info(">>>Closed " + connectionId + "\n" + fmap.get(fh).toString());
 		// if detailed monitoring is ON collector will remove it from map
 		if (ca.reportDetailed == false)
@@ -138,12 +138,12 @@ public class Collector {
 			fmap.get(fh).state |= 0x0004; // set third bit
 	}
 
-	public void connectedEvent(UUID connectionId, SocketAddress remoteAddress) {
+	public void connectedEvent(int connectionId, SocketAddress remoteAddress) {
 		currentConnections.getAndIncrement();
 		logger.info(">>>Connected " + connectionId + " " + remoteAddress);
 	}
 
-	public void disconnectedEvent(UUID connectionId, long duration) {
+	public void disconnectedEvent(int connectionId, long duration) {
 		currentConnections.getAndDecrement();
 		successfulConnections.getAndIncrement();
 		logger.info(">>>Disconnected " + connectionId + " " + duration + "ms");
@@ -231,8 +231,10 @@ public class Collector {
 			while (it.hasNext()) {
 				Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
 				FileStatistics fs = (FileStatistics) ent.getValue();
-
-				if ((fs.state & 0x0001) > 0) {  // file OPEN structure
+				
+				if (ent.getKey()<0) continue; // file has been requested but not yet really opened.
+				
+				if ( (fs.state & 0x0001) > 0) {  // file OPEN structure
 					// header
 					db.writeByte((byte) 1); // 1 - means isOpen
 					db.writeByte((byte) 0x01); // the lfn is present - 0x02 is
@@ -240,7 +242,7 @@ public class Collector {
 					int len = 21 + fs.filename.length();
 					plen += len;
 					db.writeShort(len); // size
-					db.writeInt(tos); // replace with dictid  of the file
+					db.writeInt(fs.fileId); // replace with dictid  of the file
 
 					db.writeLong(fs.filesize); // filesize at open.
 					if (true) { // check if Filenames should be reported.
@@ -259,7 +261,7 @@ public class Collector {
 				db.writeByte((byte) 3); // fileIO report
 				db.writeByte((byte) 0); // no meaning
 				db.writeShort(32); // 3*longlong + this header itself
-				db.writeInt(ent.getKey()); // replace with dictid  of the file
+				db.writeInt(fs.fileId); // replace with dictid  of the file
 				db.writeLong(fs.bytesRead.get());
 				db.writeLong(fs.bytesVectorRead.get());
 				db.writeLong(fs.bytesWritten.get());
@@ -273,7 +275,7 @@ public class Collector {
 												// XFR + OPS + MonStatSDV
 					db.writeShort(8 + 24); // size of this header
 					plen += 32;
-					db.writeInt(tos); // replace with dictid  of the file
+					db.writeInt(fs.fileId); // replace with dictid  of the file
 
 					//
 					db.writeLong(fs.bytesRead.get());
