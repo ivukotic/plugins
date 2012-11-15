@@ -167,6 +167,11 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 					logger.error("*** Can't get file description for entry: " + lfcUri.getPath());
 				}
 
+				if (entry.getGuid() == null && LFN.contains("/user/")) {
+					logger.info("maybe this is pathena registered file. Trying that...");
+					entry = ifInputIsPathenaRegistered(lfcUri.getPath(), lfcServer);
+				}
+				
 				if (entry.getGuid() == null) {
 					logger.info("maybe got container and not dataset. Trying that...");
 					entry = ifInputIsContainerDS(lfcUri.getPath(), lfcServer);
@@ -294,5 +299,24 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			return entry;
 		}
 		return entry;
-	}
 }
+
+public FileDesc ifInputIsPathenaRegistered(String path, LFCServer lfcServer) {
+	FileDesc entry = new FileDesc();
+	path = path.replaceAll("\\b//\\b", "/");
+	logger.info("stripped path -> " + path);
+
+	path=path.replace("user","users/pathena");
+	logger.info("filename changed to pathena one -> " + path);
+
+	try {
+		entry = lfcServer.fetchFileDesc(lfcUri.getPath());
+	} catch (Exception e1) {
+		logger.error("*** It did not work. ");
+		return entry;
+	}
+	return entry;
+}
+
+}
+
