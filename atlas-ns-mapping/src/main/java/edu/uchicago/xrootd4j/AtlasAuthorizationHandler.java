@@ -61,7 +61,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			config = new LFCConfig();
 			config.globusCredential = getValidProxy();
 		} catch (Exception e) {
-//			e.printStackTrace();
+			// e.printStackTrace();
 			logger.warn("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access.");
 			config = null;
 		}
@@ -126,10 +126,10 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 		logger.info("GOT to translate: " + LFN);
 
 		if (config != null) { // access through API
-			
+
 			if (config.globusCredential.getTimeLeft() <= 60)
 				getValidProxy();
-			
+
 			try {
 				lfcUri = new URI(LFN);
 				logger.info("Is a proper url.");
@@ -171,7 +171,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 					logger.info("maybe this is pathena registered file. Trying that...");
 					entry = ifInputIsPathenaRegistered(lfcUri.getPath(), lfcServer);
 				}
-				
+
 				if (entry.getGuid() == null) {
 					logger.info("maybe got container and not dataset. Trying that...");
 					entry = ifInputIsContainerDS(lfcUri.getPath(), lfcServer);
@@ -184,8 +184,8 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				guid = entry.getGuid();
 			}
 
-			logger.info("guid:"+guid);
-			
+			logger.info("guid:" + guid);
+
 			try {
 				ArrayList<ReplicaDesc> replicas = lfcServer.getReplicas(guid);
 				if (replicas.isEmpty()) {
@@ -299,24 +299,23 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			return entry;
 		}
 		return entry;
-}
+	}
 
-public FileDesc ifInputIsPathenaRegistered(String path, LFCServer lfcServer) {
-	FileDesc entry = new FileDesc();
-	path = path.replaceAll("\\b//\\b", "/");
-	logger.info("stripped path -> " + path);
+	public FileDesc ifInputIsPathenaRegistered(String path, LFCServer lfcServer) {
+		FileDesc entry = new FileDesc();
+		path = path.replaceAll("\\b//\\b", "/");
+		logger.info("stripped path -> " + path);
 
-	path=path.replace("user","users/pathena");
-	logger.info("filename changed to pathena one -> " + path);
+		path = path.replace("user", "users/pathena");
+		logger.info("filename changed to pathena one -> " + path);
 
-	try {
-		entry = lfcServer.fetchFileDesc(lfcUri.getPath());
-	} catch (Exception e1) {
-		logger.error("*** It did not work. ");
+		try {
+			entry = lfcServer.fetchFileDesc(lfcUri.getPath());
+		} catch (Exception e1) {
+			logger.error("*** It did not work. ");
+			return entry;
+		}
 		return entry;
 	}
-	return entry;
-}
 
 }
-

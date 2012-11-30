@@ -2,8 +2,6 @@ package edu.uchicago.monitor;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.UUID;
-
 import org.dcache.xrootd.protocol.messages.AbstractResponseMessage;
 import org.dcache.xrootd.protocol.messages.CloseRequest;
 import org.dcache.xrootd.protocol.messages.GenericReadRequestMessage.EmbeddedReadRequest;

@@ -19,7 +19,6 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <version.slf4j>1.6.1</version.slf4j>
     <version.xrootd4j>1.2-SNAPSHOT</version.xrootd4j>
   </properties>
 
@@ -45,7 +44,7 @@
     <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-api</artifactId>
-        <version>${version.slf4j}</version>
+        <version>1.7.2</version>
     </dependency>
     <dependency>
         <groupId>org.dcache</groupId>
