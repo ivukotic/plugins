@@ -45,13 +45,17 @@ public class Collector {
 	private String servername;
 	private Properties properties;
 
-	private int tos;
+	private int tos; // time of server start
+	private int tosc; // time of start of info collection
+	private int toec; // time of end of info collection
+	
 	private int pid;
-	private byte fseq;
+	private byte fseq=0;
 	private int dictid;
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap b;
+	private ConnectionlessBootstrap b1;
 
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
 
@@ -61,7 +65,7 @@ public class Collector {
 	public AtomicLong totBytesRead = new AtomicLong();
 	public AtomicLong totBytesWriten = new AtomicLong();
 	private CollectorAddresses ca = new CollectorAddresses();
-	
+
 	// Timer timer = new Timer();
 
 	Collector(Properties properties) {
@@ -94,7 +98,8 @@ public class Collector {
 		logger.info(ca.toString());
 
 		tos = (int) (System.currentTimeMillis() / 1000L);
-
+		tosc=tos;
+		
 		try {
 			pid = Integer.parseInt(new File("/proc/self").getCanonicalFile().getName());
 		} catch (Exception e) {
@@ -114,9 +119,23 @@ public class Collector {
 		// b.setOption("receiveBufferSizePredictorFactory", new
 		// FixedReceiveBufferSizePredictorFactory(1024));
 		// b.setOption("sendBufferSize",32000);
+		b.setOption("localAddress", new InetSocketAddress(25000));
 		b.setOption("broadcast", "true");
 		b.setOption("connectTimeoutMillis", 10000);
 
+		b1 = new ConnectionlessBootstrap(f);
+
+		b1.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
+			}
+		});
+		b1.setOption("localAddress", new InetSocketAddress(25001));
+		b1.setOption("broadcast", "true");
+		b1.setOption("connectTimeoutMillis", 10000);
+		
+		
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
@@ -172,11 +191,59 @@ public class Collector {
 
 	public void SendMapMessage(Integer dictid, String content) {
 		logger.info("sending map message: " + content);
-
 		for (Address a : ca.detailed) {
-			new MapMessagesSender(a, dictid, content);
+			MapMessagesSender mms = new MapMessagesSender(a, dictid, content);
+			mms.start();
 		}
 	}
+
+//	public void sendMyMessage(Integer dictid, String content) {
+//		for (Address a : ca.detailed) {
+//			InetSocketAddress destination = new InetSocketAddress(a.address, a.port);
+//			try {
+//				DatagramChannel c = (DatagramChannel) b.bind();
+//				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=fuck";
+//				content += authinfo;
+//
+//				logger.info("sending map message: " + content);
+//				short plen = (short) (12 + content.length());
+//				ChannelBuffer db = dynamicBuffer(plen);
+//
+//				// main header
+//				db.writeByte((byte) 117); // 'u'
+//				db.writeByte((byte) fseq);
+//				db.writeShort(plen);
+//				db.writeInt(tos);
+//				db.writeInt(dictid); // this is dictID
+//				db.writeBytes(content.getBytes());
+//				ChannelFuture f = c.write(db, destination);
+//
+//				f.addListener(new ChannelFutureListener() {
+//					public void operationComplete(ChannelFuture future) throws Exception {
+//						if (future.isSuccess()) {
+//							logger.debug("OK sent. ");
+//						} else {
+//							logger.error("NOT sent. ");
+//						}
+//					}
+//				});
+//
+//				ChannelFuture f1 = c.close();
+//				f1.addListener(new ChannelFutureListener() {
+//					public void operationComplete(ChannelFuture future) throws Exception {
+//						if (future.isSuccess()) {
+//							logger.debug("Connection CLOSED. ");
+//						} else {
+//							logger.error("Connection NOT CLOSED. ");
+//						}
+//					}
+//				});
+//
+//			} catch (Exception e) {
+//				logger.error("unrecognized exception: " + e.getMessage());
+//			}
+//		}
+//	}
 
 	private class MapMessagesSender extends Thread {
 		private InetSocketAddress destination;
@@ -187,12 +254,12 @@ public class Collector {
 			destination = new InetSocketAddress(a.address, a.port);
 			this.dictid = dictid;
 			this.content = content;
-			this.run();
 		}
 
 		public void run() {
 			try {
-				DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
+				fseq+=1;
+				DatagramChannel c = (DatagramChannel) b.bind();
 				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=fuck";
 				content += authinfo;
 				short plen = (short) (12 + content.length());
@@ -207,16 +274,37 @@ public class Collector {
 				db.writeBytes(content.getBytes());
 				ChannelFuture f = c.write(db, destination);
 
-				f.addListener(new ChannelFutureListener() {
-					public void operationComplete(ChannelFuture future) throws Exception {
-						if (future.isSuccess()) {
-							logger.debug("OK sent. ");
-						} else {
-							logger.error("NOT sent. ");
-						}
-					}
-				});
+				f.awaitUninterruptibly();
+				if (!f.isSuccess()) {
+					f.getCause().printStackTrace();
+				} else {
+					logger.info("MAP MSG sent ok");
+				}
 				c.close();
+
+				// f.addListener(new ChannelFutureListener() {
+				// public void operationComplete(ChannelFuture future) throws
+				// Exception {
+				// if (future.isSuccess()) {
+				// logger.debug("OK sent. ");
+				// } else {
+				// logger.error("NOT sent. ");
+				// }
+				// }
+				// });
+				//
+				// ChannelFuture f1=c.close();
+				// f1.addListener(new ChannelFutureListener() {
+				// public void operationComplete(ChannelFuture future) throws
+				// Exception {
+				// if (future.isSuccess()) {
+				// logger.debug("Connection CLOSED. ");
+				// } else {
+				// logger.error("Connection NOT CLOSED. ");
+				// }
+				// }
+				// });
+
 			} catch (Exception e) {
 				logger.error("unrecognized exception: " + e.getMessage());
 			}
@@ -245,7 +333,7 @@ public class Collector {
 					+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
 			// logger.info(xmlmessage);
 
-			DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
+			DatagramChannel c = (DatagramChannel) b1.bind();
 
 			ChannelFuture f = c.write(xmlmessage, new InetSocketAddress(a.address, a.port));
 
@@ -272,7 +360,8 @@ public class Collector {
 
 		private void sendFstream() {
 			logger.info("sending detailed stream");
-			DatagramChannel c = (DatagramChannel) b.bind(new InetSocketAddress(0));
+			fseq+=1;
+			DatagramChannel c = (DatagramChannel) b.bind();
 			short plen = (short) (24 + 32 * fmap.size()); // this is length of 2
 															// mandatory headers
 			ChannelBuffer db = dynamicBuffer(plen);
@@ -290,16 +379,19 @@ public class Collector {
 			db.writeShort(0); // since this is TOD - this is nRec[0]
 			db.writeShort(0); // this gives total number of "subpackages". will
 								// be overwritten bellow
-			db.writeInt(tos); // unix time - this should be start of package
+			db.writeInt(tosc); // unix time - this should be start of package
 								// collection time
-			db.writeInt(tos); // unix time - this should be time of sending.
-
+			toec=(int) (System.currentTimeMillis() / 1000L);
+			db.writeInt(toec); // unix time - this should be time of sending.
+			tosc=toec;
 			int subpackets = 0;
 			Iterator<Entry<Integer, FileStatistics>> it = fmap.entrySet().iterator();
 			while (it.hasNext()) {
 				Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
 				FileStatistics fs = (FileStatistics) ent.getValue();
-				Integer dictID = ent.getKey();
+				Integer dictID = ent.getKey();// user_dictid - actually
+												// connectionID. should be
+												// changed later for proof.
 
 				if (dictID < 0)
 					continue; // file has been requested but not yet really
@@ -318,7 +410,6 @@ public class Collector {
 					db.writeLong(fs.filesize); // filesize at open.
 					if (true) { // check if Filenames should be reported.
 						db.writeInt(dictID);// user_dictid
-						logger.error("userID: "+dictID);
 						db.writeBytes(fs.filename.getBytes());// maybe should be
 																// forced to
 																// "US-ASCII"?
@@ -376,7 +467,7 @@ public class Collector {
 				f.getCause().printStackTrace();
 			}
 			// else { logger.info("sent ok");}
-			c.close();
+			f = c.close();
 		}
 
 	}

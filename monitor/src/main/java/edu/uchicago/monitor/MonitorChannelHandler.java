@@ -117,6 +117,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				fs.mode = mode;
 				collector.fmap.put(-or.getStreamId(), fs);
 				collector.SendMapMessage(connId,"ivukotic.12345:"+connId+"@mycomputer");
+//				collector.sendMyMessage(connId,"ivukotic.12345:"+connId+"@mycomputer");
 				logger.info("------------------------------------");
 			}
 
