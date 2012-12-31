@@ -1,6 +1,5 @@
 package edu.uchicago.monitor;
 
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
 
 class FileStatistics

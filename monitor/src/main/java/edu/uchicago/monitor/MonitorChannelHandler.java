@@ -9,6 +9,7 @@ import org.dcache.xrootd.protocol.messages.LoginRequest;
 import org.dcache.xrootd.protocol.messages.LoginResponse;
 import org.dcache.xrootd.protocol.messages.OpenRequest;
 import org.dcache.xrootd.protocol.messages.OpenResponse;
+import org.dcache.xrootd.protocol.messages.ProtocolRequest;
 import org.dcache.xrootd.protocol.messages.ReadRequest;
 import org.dcache.xrootd.protocol.messages.ReadVRequest;
 import org.dcache.xrootd.protocol.messages.WriteRequest;
@@ -17,7 +18,7 @@ import org.jboss.netty.channel.ChannelEvent;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelState;
 import org.jboss.netty.channel.ChannelStateEvent;
-import org.jboss.netty.channel.DefaultExceptionEvent;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.WriteCompletionEvent;
@@ -29,7 +30,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 	final Logger logger = LoggerFactory.getLogger(MonitorChannelHandler.class);
 
 	private final Collector collector;
-//	private final UUID connectionId = UUID.randomUUID();
 	private int connId = 0;
 	private static int fileCounter=100;
 	private long duration;
@@ -40,12 +40,12 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	@Override
 	public void handleUpstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
+		logger.info("UP mess:"+ e.toString());
+        
 		if (e instanceof MessageEvent) {
-
+			logger.info("MessageEvent UP");
 			MessageEvent me = (MessageEvent) e;
 			connId=me.getChannel().getId();
-			
-			logger.debug("REQ: " + me.toString());
 			Object message = me.getMessage();
 
 			if (message instanceof ReadRequest) {
@@ -88,7 +88,11 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			else if (message instanceof LoginRequest) {
 				LoginRequest lr = (LoginRequest) message;
 				int protocol = lr.getClientProtocolVersion();
+				String user=lr.getUserName();
+				int userpid=lr.getPID();
+				logger.info("login request: client username" + user);
 				logger.info("login request: client protocol" + protocol);
+				logger.info("login request: client PID" + userpid);
 			}
 
 			// from OpenRequest we get:
@@ -107,7 +111,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				else
 					mode = 0; // not correct
 				logger.info("FILE OPEN REQUEST -------------------- stream Id: " + or.getStreamId());
-//				logger.info("connUUID:   " + connectionId.toString());
 				logger.info("connId:     " + connId);
 				logger.info("path:     " + or.getPath());
 				logger.info("readonly: " + mode);
@@ -122,9 +125,8 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else if (message instanceof CloseRequest) {
-				CloseRequest cr = (CloseRequest) message;
+//				CloseRequest cr = (CloseRequest) message;
 				logger.info("FILE CLOSE REQUEST --------------------");
-//				logger.info("connUUID:   " + connectionId.toString());
 				logger.info("connId:     " + connId);
 //				collector.closeEvent(connId, cr.getFileHandle());
 				collector.closeEvent(connId, connId);
@@ -139,49 +141,62 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				fs.writes.getAndIncrement();
 				collector.totBytesWriten.getAndAdd(wr.getDataLength());
 			}
-
+			else if (message instanceof ProtocolRequest) {
+				ProtocolRequest req = (ProtocolRequest) message;
+				logger.info("ProtocolRequest streamId: " + req.getStreamId() + "\treqID: " + req.getRequestId() +"\t data:"+req.toString() );
+			}
 			else if (message instanceof XrootdRequest) {
 				XrootdRequest req = (XrootdRequest) message;
-				logger.info("I-> streamID: " + req.getStreamId() + "\treqID: " + req.getRequestId());
+				logger.info("I-> streamID: " + req.getStreamId() + "\treqID: " + req.getRequestId() +"\t data:"+req.toString());
 			}
-
+			else{
+				logger.info("Unhandled message event UP: " + me.toString());
+			}
 		}
 
 		else if (e instanceof ChannelStateEvent) {
+			logger.info("ChannelStateEvent UP");
+			
 			ChannelStateEvent se = (ChannelStateEvent) e;
-			logger.debug("Channel State Event UP : " + se.getState().toString());// +"\t"+
-																					// se.getValue().toString());
+//			logger.debug("Channel State Event UP : " + se.getState().toString() +"\t"+  se.getValue().toString());
+			
 			if (se.getState() == ChannelState.OPEN && se.getValue() != null) {
 				if (se.getValue() == Boolean.TRUE) {
-					logger.info("CONNECTION OPEN ATTEMPT EVENT --------------------");
+					logger.info("CONNECTION OPEN ATTEMPT EVENT");
 					collector.addConnectionAttempt();
-					logger.info("---------------------------------------");
+					logger.info("done.");
 				}
 			}
 
 			else if (se.getState() == ChannelState.CONNECTED && se.getValue() == null) {
 				logger.info("DISCONNECT EVENT --------------------");
 				duration = System.currentTimeMillis() - duration;
-//				logger.info("connID:             " + connectionId.toString());
 				logger.info("connId:             " + connId);
 				logger.info("connection duration:" + duration);
 				collector.disconnectedEvent(connId, duration);
 				logger.info("------------------------------------");
 				logger.info(collector.toString());
 			}
-			// else logger.info(se.getValue().toString());
+			 else {
+				 logger.info("Unhandled ChannelState Event UP : " + se.getState().toString() +"\t"+  se.toString());
+			 }
+			
 		}
 
 		else if (e instanceof WriteCompletionEvent) {
-			// logger.info(" write completed UP");
+			logger.info("WriteCompletionEvent UP");
+        	WriteCompletionEvent me = (WriteCompletionEvent) e;
+        	logger.info(me.toString());
 		}
 
-		else if (e instanceof DefaultExceptionEvent) { // not an instanceof
-														// MessageEvent
-			DefaultExceptionEvent dee = (DefaultExceptionEvent) e;
+		else if (e instanceof ExceptionEvent) { 
+			logger.info("ExceptionEvent UP");
+			ExceptionEvent dee = (ExceptionEvent) e;
 			logger.error("eXception thrown message " + dee.toString());
-		} else { // not an instanceof MessageEvent or DefaultExceptionEvent
-			logger.info("Monitor not handling this kind of message.");
+		} 
+		
+		else { // completely impossible
+			logger.info("Monitor not handling this kind of message. UP");
 		}
 
 		super.handleUpstream(ctx, e);
@@ -189,11 +204,13 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	@Override
 	public void handleDownstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
-		if (e instanceof MessageEvent) {
 
+		logger.info("DOWN mess:"+ e.toString());
+		
+		if (e instanceof MessageEvent) {
+			logger.info("MessageEvent DOWN");
+			
 			MessageEvent me = (MessageEvent) e;
-			logger.debug("RES: " + me.toString());
-			// logger.info("remote address: " + me.getRemoteAddress());
 			Object message = me.getMessage();
 			if (me.getChannel().getId()!=connId){
 				logger.error("response before request! very strange");
@@ -229,7 +246,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 				duration = System.currentTimeMillis();
 				logger.info("CONNECT EVENT ----------------------");
-//				logger.info("connUUID:   " + connectionId.toString());
 				logger.info("connId:     " + connId);
 				logger.info("host ip:    " + e.getChannel().getRemoteAddress());
 				collector.connectedEvent(connId, e.getChannel().getRemoteAddress());
@@ -257,28 +273,41 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else if (message instanceof AbstractResponseMessage) {
-				// AbstractResponseMessage ARM=(AbstractResponseMessage)
-				// message;
-				// XrootdRequest req = ARM.getRequest();
-				// logger.info("I-> streamID: "+req.getStreamId()+
-				// "\treqID: "+req.getRequestId());
-				// logger.info("IB->: "+
-				// (ARM.getBuffer()).toString("UTF-8") ) ;
-
+//				 AbstractResponseMessage ARM=(AbstractResponseMessage) message;
+//				 XrootdRequest req = ARM.getRequest();
+//				 logger.info("I-> streamID: "+req.getStreamId()+ "\treqID: "+req.getRequestId());
+//				 logger.info("IB->: "+ (ARM.getBuffer()).toString("UTF-8") ) ;
+				 logger.info("Unhandled AbstractResponseMessage DOWN: "+ me.toString());
+			}
+			else { 
+				logger.info("Unhandled MessageEvent DOWN: "+ me.toString() );
 			}
 
 		}
 
 		else if (e instanceof ChannelStateEvent) {
+			logger.info("ChannelStateEvent DOWN");
+			
 			ChannelStateEvent se = (ChannelStateEvent) e;
 			logger.info("Channel State Event DOWN : " + se.getState().toString() + "\t" + se.getValue().toString());
 		}
 
 		else if (e instanceof WriteCompletionEvent) {
-			// logger.info(" write completed DOWN");
-		} else {
-			logger.info("Monitor not handling this kind of message.");
+			logger.info("WriteCompletionEvent DOWN");
+        	WriteCompletionEvent me = (WriteCompletionEvent) e;
+        	logger.info(me.toString());
 		}
+
+		else if (e instanceof ExceptionEvent) { 
+			logger.info("ExceptionEvent DOWN");
+			ExceptionEvent dee = (ExceptionEvent) e;
+			logger.error("eXception thrown message " + dee.toString());
+		} 
+		
+		else { // completely impossible
+			logger.info("Monitor not handling this kind of message. DOWN");
+		}
+		
 		super.handleDownstream(ctx, e);
 	}
 

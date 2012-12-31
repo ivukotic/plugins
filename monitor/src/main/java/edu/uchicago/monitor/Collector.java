@@ -4,15 +4,12 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.ArrayList;
 import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -24,7 +21,6 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import static org.jboss.netty.buffer.ChannelBuffers.*;
 
 import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
@@ -51,7 +47,6 @@ public class Collector {
 	
 	private int pid;
 	private byte fseq=0;
-	private int dictid;
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap b;
@@ -119,7 +114,7 @@ public class Collector {
 		// b.setOption("receiveBufferSizePredictorFactory", new
 		// FixedReceiveBufferSizePredictorFactory(1024));
 		// b.setOption("sendBufferSize",32000);
-		b.setOption("localAddress", new InetSocketAddress(25000));
+		b.setOption("localAddress", new InetSocketAddress(9934));
 		b.setOption("broadcast", "true");
 		b.setOption("connectTimeoutMillis", 10000);
 
@@ -131,7 +126,7 @@ public class Collector {
 						new SimpleChannelUpstreamHandler());
 			}
 		});
-		b1.setOption("localAddress", new InetSocketAddress(25001));
+		b1.setOption("localAddress", new InetSocketAddress(9935));
 		b1.setOption("broadcast", "true");
 		b1.setOption("connectTimeoutMillis", 10000);
 		
