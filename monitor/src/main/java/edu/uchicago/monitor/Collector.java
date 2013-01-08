@@ -44,9 +44,15 @@ public class Collector {
 	private int tos; // time of server start
 	private int tosc; // time of start of info collection
 	private int toec; // time of end of info collection
-	
+
+	// 0- basic
+	// 1- close due to disconnect
+	// 2- MonStatXFR + MonStatOPS
+	// 6- XFR + OPS + MonStatSDV
+	private int closedetails = 0;
+
 	private int pid;
-	private byte fseq=0;
+	private byte fseq = 0;
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap b;
@@ -93,8 +99,8 @@ public class Collector {
 		logger.info(ca.toString());
 
 		tos = (int) (System.currentTimeMillis() / 1000L);
-		tosc=tos;
-		
+		tosc = tos;
+
 		try {
 			pid = Integer.parseInt(new File("/proc/self").getCanonicalFile().getName());
 		} catch (Exception e) {
@@ -129,8 +135,7 @@ public class Collector {
 		b1.setOption("localAddress", new InetSocketAddress(9935));
 		b1.setOption("broadcast", "true");
 		b1.setOption("connectTimeoutMillis", 10000);
-		
-		
+
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
@@ -192,53 +197,54 @@ public class Collector {
 		}
 	}
 
-//	public void sendMyMessage(Integer dictid, String content) {
-//		for (Address a : ca.detailed) {
-//			InetSocketAddress destination = new InetSocketAddress(a.address, a.port);
-//			try {
-//				DatagramChannel c = (DatagramChannel) b.bind();
-//				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=fuck";
-//				content += authinfo;
-//
-//				logger.info("sending map message: " + content);
-//				short plen = (short) (12 + content.length());
-//				ChannelBuffer db = dynamicBuffer(plen);
-//
-//				// main header
-//				db.writeByte((byte) 117); // 'u'
-//				db.writeByte((byte) fseq);
-//				db.writeShort(plen);
-//				db.writeInt(tos);
-//				db.writeInt(dictid); // this is dictID
-//				db.writeBytes(content.getBytes());
-//				ChannelFuture f = c.write(db, destination);
-//
-//				f.addListener(new ChannelFutureListener() {
-//					public void operationComplete(ChannelFuture future) throws Exception {
-//						if (future.isSuccess()) {
-//							logger.debug("OK sent. ");
-//						} else {
-//							logger.error("NOT sent. ");
-//						}
-//					}
-//				});
-//
-//				ChannelFuture f1 = c.close();
-//				f1.addListener(new ChannelFutureListener() {
-//					public void operationComplete(ChannelFuture future) throws Exception {
-//						if (future.isSuccess()) {
-//							logger.debug("Connection CLOSED. ");
-//						} else {
-//							logger.error("Connection NOT CLOSED. ");
-//						}
-//					}
-//				});
-//
-//			} catch (Exception e) {
-//				logger.error("unrecognized exception: " + e.getMessage());
-//			}
-//		}
-//	}
+	// public void sendMyMessage(Integer dictid, String content) {
+	// for (Address a : ca.detailed) {
+	// InetSocketAddress destination = new InetSocketAddress(a.address, a.port);
+	// try {
+	// DatagramChannel c = (DatagramChannel) b.bind();
+	// String authinfo =
+	// "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=fuck";
+	// content += authinfo;
+	//
+	// logger.info("sending map message: " + content);
+	// short plen = (short) (12 + content.length());
+	// ChannelBuffer db = dynamicBuffer(plen);
+	//
+	// // main header
+	// db.writeByte((byte) 117); // 'u'
+	// db.writeByte((byte) fseq);
+	// db.writeShort(plen);
+	// db.writeInt(tos);
+	// db.writeInt(dictid); // this is dictID
+	// db.writeBytes(content.getBytes());
+	// ChannelFuture f = c.write(db, destination);
+	//
+	// f.addListener(new ChannelFutureListener() {
+	// public void operationComplete(ChannelFuture future) throws Exception {
+	// if (future.isSuccess()) {
+	// logger.debug("OK sent. ");
+	// } else {
+	// logger.error("NOT sent. ");
+	// }
+	// }
+	// });
+	//
+	// ChannelFuture f1 = c.close();
+	// f1.addListener(new ChannelFutureListener() {
+	// public void operationComplete(ChannelFuture future) throws Exception {
+	// if (future.isSuccess()) {
+	// logger.debug("Connection CLOSED. ");
+	// } else {
+	// logger.error("Connection NOT CLOSED. ");
+	// }
+	// }
+	// });
+	//
+	// } catch (Exception e) {
+	// logger.error("unrecognized exception: " + e.getMessage());
+	// }
+	// }
+	// }
 
 	private class MapMessagesSender extends Thread {
 		private InetSocketAddress destination;
@@ -253,9 +259,9 @@ public class Collector {
 
 		public void run() {
 			try {
-				fseq+=1;
+				fseq += 1;
 				DatagramChannel c = (DatagramChannel) b.bind();
-				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=fuck";
+				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=whatever";
 				content += authinfo;
 				short plen = (short) (12 + content.length());
 				ChannelBuffer db = dynamicBuffer(plen);
@@ -354,11 +360,12 @@ public class Collector {
 		}
 
 		private void sendFstream() {
-			logger.info("sending detailed stream");
-			fseq+=1;
+			logger.warn("sending detailed stream");
+			fseq += 1;
 			DatagramChannel c = (DatagramChannel) b.bind();
-			short plen = (short) (24 + 32 * fmap.size()); // this is length of 2
-															// mandatory headers
+
+			logger.warn("fmap size: " + fmap.size());
+			short plen = (short) (24); // this is length of 2 mandatory headers
 			ChannelBuffer db = dynamicBuffer(plen);
 
 			// main header
@@ -376,9 +383,9 @@ public class Collector {
 								// be overwritten bellow
 			db.writeInt(tosc); // unix time - this should be start of package
 								// collection time
-			toec=(int) (System.currentTimeMillis() / 1000L);
+			toec = (int) (System.currentTimeMillis() / 1000L);
 			db.writeInt(toec); // unix time - this should be time of sending.
-			tosc=toec;
+			tosc = toec;
 			int subpackets = 0;
 			Iterator<Entry<Integer, FileStatistics>> it = fmap.entrySet().iterator();
 			while (it.hasNext()) {
@@ -424,35 +431,75 @@ public class Collector {
 				db.writeLong(fs.bytesRead.get());
 				db.writeLong(fs.bytesVectorRead.get());
 				db.writeLong(fs.bytesWritten.get());
+				plen+=32;
 				subpackets += 1;
 
 				if ((fs.state & 0x0004) > 0) { // add fileclose structure
 					// header
 					db.writeByte((byte) 0); // 0 - means isClose
-					db.writeByte((byte) 0x00); // 0- basic 2- MonStatXFR +
-												// MonStatOPS 1-
-												// close due to disconnect 4-
-												// XFR + OPS + MonStatSDV
-					db.writeShort(8 + 24); // size of this header
-					plen += 32;
+
+					db.writeByte((byte) closedetails);
+
+					int packlength = 8;
+					switch (closedetails) {
+					case 0:
+						packlength += 24;
+						break;
+					case 1:
+						// do nothing
+						break;
+					case 2:
+						packlength += 24 + 48;
+						break;
+					case 6:
+						packlength += 24 + 48 + 64;
+						break;
+					}
+
+					db.writeShort(packlength); // size of this header
 					db.writeInt(fs.fileId); // replace with dictid of the file
 
-					//
-					db.writeLong(fs.bytesRead.get());
-					db.writeLong(fs.bytesVectorRead.get());
-					db.writeLong(fs.bytesWritten.get());
+					if (closedetails != 1) {
+						db.writeLong(fs.bytesRead.get());
+						db.writeLong(fs.bytesVectorRead.get());
+						db.writeLong(fs.bytesWritten.get());
+					} 
+					
+					if ( closedetails >1 ) { // OPS
+						db.writeInt(111); // reads
+						db.writeInt(112); // readVs
+						db.writeInt(113); // writes
+						db.writeShort(11); // shortest readv segments
+						db.writeShort(12); // longest readv segments
+						db.writeLong(123456); // number of readv segments
+						db.writeInt(111000); // rdMin
+						db.writeInt(112000); // rdMax
+						db.writeInt(113000); // rvMin
+						db.writeInt(111001); // rvMax
+						db.writeInt(112002); // wrMin
+						db.writeInt(113003); // wrMax
+					}
 
-					// if (false){
-					// here if ops or SDV was required
-					// }
+					if (closedetails == 6) { //SSQ
+						db.writeLong(123456); // number of readv segments
+						db.writeDouble(123.123);
+						db.writeLong(123456); // number of readv segments
+						db.writeDouble(123.123);
+						db.writeLong(123456); // number of readv segments
+						db.writeDouble(123.123);
+						db.writeLong(123456); // number of readv segments
+						db.writeDouble(123.123);
+					}
 
 					// remove it
 					it.remove();
 					subpackets += 1;
+					plen += packlength;
 				}
 
 			}
 
+			logger.warn("message length: " + plen+"\t buffer length:"+db.writableBytes() );
 			db.setShort(2, plen);
 			db.setShort(14, subpackets);
 

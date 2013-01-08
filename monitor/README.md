@@ -30,12 +30,28 @@ Using the plugin with dCache
 To use this plugin with dCache, place the directory containing this
 file in /usr/local/share/dcache/plugins/
 
-To enable only this plugin, define the following property in dcache.conf:
-    xrootd/ xrootdPlugins=authn:none,authz:none,edu.uchicago.monitor
-    pool/   xrootdPlugins=
+
+On the pool nodes you need only monitoring plugin:
+
+	### Monitoring plugin
+	pool/xrootdPlugins=edu.uchicago.monitor
+	summary=atl-prod05.slac.stanford.edu:9931:60
+	detailed=atl-prod05.slac.stanford.edu:9930:60
+
+on a door node you need both N2N and monitor:
+
+	### Monitoring plugin
+	pool/xrootdPlugins=edu.uchicago.monitor
+	### N2N plugin
+	xrootdAuthzPlugin=atlas-name-to-name-plugin
 	
-    summary=atl-prod05.slac.stanford.edu:9931:60,localhost:9931:17
-	detailed=localhost:9930:13
+	summary=atl-prod05.slac.stanford.edu:9931:60
+	detailed=atl-prod05.slac.stanford.edu:9930:60
+
+While using xrootdAuthzPlugin gives a worning message that it is obsolete, command:   
+	xrootd/ xrootdPlugins=authn:atlas-name-to-name-plugin,authz:none
+was not properly tested.
+	
 
 If your server is behind NAT, you should also define property servername in a form:
 	servername=myserver.mydomain.org
