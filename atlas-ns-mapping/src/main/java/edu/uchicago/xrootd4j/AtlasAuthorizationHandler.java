@@ -57,9 +57,9 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			logger.info("Setting SRM_HOST to: " + SRM_HOST);
 		}
 		try {
-			logger.info("trying to get proxy...");
 			config = new LFCConfig();
-			config.globusCredential = getValidProxy();
+			// logger.info("trying to get proxy...");
+			// config.globusCredential = getValidProxy();
 		} catch (Exception e) {
 			// e.printStackTrace();
 			logger.warn("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access.");
@@ -72,7 +72,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		// custom proxy
 		if (proxyFile != null) {
-			logger.info("Using proxy from:" + proxyFile);
+			logger.error("Using proxy from:" + proxyFile);
 			try {
 				cred = new GlobusCredential(proxyFile);
 			} catch (GlobusCredentialException e) {
@@ -81,7 +81,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				throw new MissingResourceException("*** Error: problem when getting credential from file: " + proxyFile, "GlobusCredential", "");
 			}
 		} else {
-			logger.info("Using default proxy file.");
+			logger.error("Using default proxy file.");
 			try {
 				cred = GlobusCredential.getDefaultCredential();
 			} catch (GlobusCredentialException e) {
@@ -101,7 +101,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			throw new MissingResourceException("*** Error: Expired Credential detected.", "GlobusCredential", "");
 		}
 
-		logger.info("proxy timeleft=" + cred.getTimeLeft());
+		logger.error("proxy timeleft=" + cred.getTimeLeft());
 
 		return cred;
 	}
@@ -109,6 +109,8 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 	@Override
 	public String authorize(Subject subject, InetSocketAddress localAddress, InetSocketAddress remoteAddress, String path, Map<String, String> opaque,
 			int request, FilePerm mode) throws SecurityException, GeneralSecurityException {
+
+		logger.error("GOT to translate: " + path);
 
 		if (path.startsWith("pnfs/")) {
 			return path;
@@ -123,16 +125,16 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 		String sLFN = "lfn://grid" + LFN;
 		LFN = "lfn://" + LFC_HOST + "//grid" + LFN;
 
-		logger.info("GOT to translate: " + LFN);
+		logger.error("FINALY translating: " + LFN);
 
 		if (config != null) { // access through API
 
-			if (config.globusCredential.getTimeLeft() <= 60)
-				getValidProxy();
+			// if (config.globusCredential.getTimeLeft() <= 60)
+			// getValidProxy();
 
 			try {
 				lfcUri = new URI(LFN);
-				logger.info("Is a proper url.");
+				logger.error("Is a proper url.");
 			} catch (URISyntaxException e) {
 				e.printStackTrace();
 				logger.error("*** Error: Invalid URI:" + LFN);
@@ -168,12 +170,12 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				}
 
 				if (entry.getGuid() == null && LFN.contains("/user/")) {
-					logger.info("maybe this is pathena registered file. Trying that...");
+					logger.error("maybe this is pathena registered file. Trying that...");
 					entry = ifInputIsPathenaRegistered(lfcUri.getPath(), lfcServer);
 				}
 
 				if (entry.getGuid() == null) {
-					logger.info("maybe got container and not dataset. Trying that...");
+					logger.error("maybe got container and not dataset. Trying that...");
 					entry = ifInputIsContainerDS(lfcUri.getPath(), lfcServer);
 				}
 
@@ -184,7 +186,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				guid = entry.getGuid();
 			}
 
-			logger.info("guid:" + guid);
+			logger.error("guid:" + guid);
 
 			try {
 				ArrayList<ReplicaDesc> replicas = lfcServer.getReplicas(guid);
@@ -193,18 +195,18 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 					return "";
 				} else {
 					String PFN = "";
-					logger.info("found " + replicas.size() + " replicas.");
+					logger.error("found " + replicas.size() + " replicas.");
 					for (ReplicaDesc replica : replicas) {
 						String line = replica.getSfn();
 						if (replica.getHost().equals(SRM_HOST)) {
-							logger.info("replica found \n " + replica.toString());
+							logger.error("replica found \n " + replica.toString());
 							int li = line.lastIndexOf("=") + 1;
 							if (li < 1) {
-								logger.info("could not find = sign. looking for /pnfs");
+								logger.error("could not find = sign. looking for /pnfs");
 								li = line.indexOf("/pnfs/");
 							}
 							PFN = line.substring(li);
-							logger.info("PFN: " + PFN);
+							logger.error("PFN: " + PFN);
 							return PFN;
 						}
 					}
@@ -221,7 +223,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		else { // access through lcg-lr
 
-			logger.info("Trying to use lcg-lr " + sLFN);
+			logger.error("Trying to use lcg-lr " + sLFN);
 			ProcessBuilder pb = new ProcessBuilder("lcg-lr", sLFN, "--connect-timeout", "10");
 			Map<String, String> env = pb.environment();
 			env.put("LFC_HOST", LFC_HOST);
@@ -233,25 +235,25 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				String line;
 				String PFN;
 				while ((line = br.readLine()) != null) {
-					// logger.info(line);
+					// logger.error(line);
 					if (line.indexOf(SRM_HOST) == -1)
 						continue;
 					Integer ind = line.indexOf("=") + 1;
 					if (ind > 0) { // long form
 						PFN = line.substring(ind);
-						logger.info("PFN: " + PFN);
+						logger.error("PFN: " + PFN);
 						return PFN;
 					}
 					ind = line.indexOf("/", 6);
 					if (ind > 0) { // short form
 						PFN = line.substring(ind);
-						logger.info("PFN: " + PFN);
+						logger.error("PFN: " + PFN);
 						return PFN;
 					}
-					logger.info("Could not interpret LFC name: " + line);
+					logger.error("Could not interpret LFC name: " + line);
 					return line;
 				}
-				// logger.info("lcg-lr returned.");
+				// logger.error("lcg-lr returned.");
 
 			} catch (IOException e) {
 				logger.error("IO Exception: " + e.getMessage());
@@ -264,29 +266,29 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 	public FileDesc ifInputIsContainerDS(String path, LFCServer lfcServer) {
 		FileDesc entry = new FileDesc();
-		logger.info("path -> " + path);
+		logger.error("path -> " + path);
 		path = path.replaceAll("\\b//\\b", "/");
-		logger.info("stripped path -> " + path);
+		logger.error("stripped path -> " + path);
 
 		int li = path.lastIndexOf("/");
 		String fn = path.substring(li + 1);
-		logger.info("filename -> " + fn);
+		logger.error("filename -> " + fn);
 
 		path = path.substring(0, li); // no filename
 		li = path.lastIndexOf("/");
 		String DSname = path.substring(li + 1);
-		logger.info("dsname -> " + DSname);
+		logger.error("dsname -> " + DSname);
 		String dirname = path.substring(0, li);
-		logger.info("dir -> " + dirname);
+		logger.error("dir -> " + dirname);
 
 		try {
 			ArrayList<FileDesc> dirsdescs = lfcServer.listDirectory(dirname);
-			logger.info("got list of " + dirsdescs.size() + " data sets in this container.");
+			logger.error("got list of " + dirsdescs.size() + " data sets in this container.");
 			for (FileDesc dirdesc : dirsdescs) {
-				logger.info(dirdesc.getFileName());
+				logger.error(dirdesc.getFileName());
 				if (dirdesc.getFileName().indexOf(DSname) != -1) {
 					String newFN = dirname + "/" + dirdesc.getFileName() + "/" + fn;
-					logger.info("found matching DS! trying: " + newFN);
+					logger.error("found matching DS! trying: " + newFN);
 					try {
 						return lfcServer.fetchFileDesc(newFN);
 					} catch (Exception e) {
@@ -304,10 +306,10 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 	public FileDesc ifInputIsPathenaRegistered(String path, LFCServer lfcServer) {
 		FileDesc entry = new FileDesc();
 		path = path.replaceAll("\\b//\\b", "/");
-		logger.info("stripped path -> " + path);
+		logger.error("stripped path -> " + path);
 
 		path = path.replace("user", "users/pathena");
-		logger.info("filename changed to pathena one -> " + path);
+		logger.error("filename changed to pathena one -> " + path);
 
 		try {
 			entry = lfcServer.fetchFileDesc(lfcUri.getPath());
