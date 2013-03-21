@@ -360,11 +360,11 @@ public class Collector {
 		}
 
 		private void sendFstream() {
-			logger.warn("sending detailed stream");
+			logger.debug("sending detailed stream");
 			fseq += 1;
 			DatagramChannel c = (DatagramChannel) b.bind();
 
-			logger.warn("fmap size: " + fmap.size());
+			logger.debug("fmap size: " + fmap.size());
 			short plen = (short) (24); // this is length of 2 mandatory headers
 			ChannelBuffer db = dynamicBuffer(plen);
 
@@ -499,7 +499,7 @@ public class Collector {
 
 			}
 
-			logger.warn("message length: " + plen+"\t buffer length:"+db.writableBytes() );
+			logger.debug("message length: " + plen+"\t buffer length:"+db.writableBytes() );
 			db.setShort(2, plen);
 			db.setShort(14, subpackets);
 
