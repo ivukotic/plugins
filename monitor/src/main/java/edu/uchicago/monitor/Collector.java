@@ -323,27 +323,30 @@ public class Collector {
 		}
 
 		public void run() {
+			try {
+				logger.info("sending summary stream");
 
-			logger.info("sending summary stream");
+				long tod = System.currentTimeMillis() / 1000L - 60;
+				String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
+				String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" + totBytesWriten.toString() + "</in><out>"
+						+ totBytesRead.toString() + "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
+				String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
+						+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
+				// logger.info(xmlmessage);
 
-			long tod = System.currentTimeMillis() / 1000L - 60;
-			String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
-			String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" + totBytesWriten.toString() + "</in><out>" + totBytesRead.toString()
-					+ "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
-			String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
-					+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
-			// logger.info(xmlmessage);
+				DatagramChannel c = (DatagramChannel) b1.bind();
 
-			DatagramChannel c = (DatagramChannel) b1.bind();
+				ChannelFuture f = c.write(xmlmessage, new InetSocketAddress(a.address, a.port));
 
-			ChannelFuture f = c.write(xmlmessage, new InetSocketAddress(a.address, a.port));
-
-			f.awaitUninterruptibly();
-			if (!f.isSuccess()) {
-				f.getCause().printStackTrace();
+				f.awaitUninterruptibly();
+				if (!f.isSuccess()) {
+					f.getCause().printStackTrace();
+				}
+				// else { logger.info("sent ok"); }
+				c.close();
+			} catch (Exception e) {
+				logger.error("unrecognized exception in sending summary stream: " + e.getMessage());
 			}
-			// else { logger.info("sent ok"); }
-			c.close();
 		}
 	}
 
@@ -361,155 +364,169 @@ public class Collector {
 
 		private void sendFstream() {
 			logger.debug("sending detailed stream");
-			fseq += 1;
-			DatagramChannel c = (DatagramChannel) b.bind();
+			try {
+				fseq += 1;
+				DatagramChannel c = (DatagramChannel) b.bind();
 
-			logger.debug("fmap size: " + fmap.size());
-			short plen = (short) (24); // this is length of 2 mandatory headers
-			ChannelBuffer db = dynamicBuffer(plen);
+				logger.debug("fmap size: " + fmap.size());
+				short plen = (short) (24); // this is length of 2 mandatory
+											// headers
+				ChannelBuffer db = dynamicBuffer(plen);
 
-			// main header
-			db.writeByte((byte) 102); // 'f'
-			db.writeByte((byte) fseq);
-			db.writeShort(plen); // will be replaced later
-			db.writeInt(tos);
+				// main header
+				db.writeByte((byte) 102); // 'f'
+				db.writeByte((byte) fseq);
+				db.writeShort(plen); // will be replaced later
+				db.writeInt(tos);
 
-			// first timing header
-			db.writeByte((byte) 2); // 2 - means isTime
-			db.writeByte((byte) 0); // no meaning here
-			db.writeShort(16); // size of this header
-			db.writeShort(0); // since this is TOD - this is nRec[0]
-			db.writeShort(0); // this gives total number of "subpackages". will
-								// be overwritten bellow
-			db.writeInt(tosc); // unix time - this should be start of package
-								// collection time
-			toec = (int) (System.currentTimeMillis() / 1000L);
-			db.writeInt(toec); // unix time - this should be time of sending.
-			tosc = toec;
-			int subpackets = 0;
-			Iterator<Entry<Integer, FileStatistics>> it = fmap.entrySet().iterator();
-			while (it.hasNext()) {
-				Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
-				FileStatistics fs = (FileStatistics) ent.getValue();
-				Integer dictID = ent.getKey();// user_dictid - actually
-												// connectionID. should be
-												// changed later for proof.
+				// first timing header
+				db.writeByte((byte) 2); // 2 - means isTime
+				db.writeByte((byte) 0); // no meaning here
+				db.writeShort(16); // size of this header
+				db.writeShort(0); // since this is TOD - this is nRec[0]
+				db.writeShort(0); // this gives total number of "subpackages".
+									// will
+									// be overwritten bellow
+				db.writeInt(tosc); // unix time - this should be start of
+									// package
+									// collection time
+				toec = (int) (System.currentTimeMillis() / 1000L);
+				db.writeInt(toec); // unix time - this should be time of
+									// sending.
+				tosc = toec;
+				int subpackets = 0;
+				Iterator<Entry<Integer, FileStatistics>> it = fmap.entrySet().iterator();
+				while (it.hasNext()) {
+					Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
+					FileStatistics fs = (FileStatistics) ent.getValue();
+					Integer dictID = ent.getKey();// user_dictid - actually
+													// connectionID. should be
+													// changed later for proof.
 
-				if (dictID < 0)
-					continue; // file has been requested but not yet really
-								// opened.
+					if (dictID < 0)
+						continue; // file has been requested but not yet really
+									// opened.
 
-				if ((fs.state & 0x0001) > 0) { // file OPEN structure
-					// header
-					db.writeByte((byte) 1); // 1 - means isOpen
-					db.writeByte((byte) 0x01); // the lfn is present - 0x02 is
-												// R/W
-					int len = 21 + fs.filename.length();
-					plen += len;
-					db.writeShort(len); // size
-					db.writeInt(fs.fileId); // replace with dictid of the file
+					if ((fs.state & 0x0001) > 0) { // file OPEN structure
+						// header
+						db.writeByte((byte) 1); // 1 - means isOpen
+						db.writeByte((byte) 0x01); // the lfn is present - 0x02
+													// is
+													// R/W
+						int len = 21 + fs.filename.length();
+						plen += len;
+						db.writeShort(len); // size
+						db.writeInt(fs.fileId); // replace with dictid of the
+												// file
 
-					db.writeLong(fs.filesize); // filesize at open.
-					if (true) { // check if Filenames should be reported.
-						db.writeInt(dictID);// user_dictid
-						db.writeBytes(fs.filename.getBytes());// maybe should be
-																// forced to
-																// "US-ASCII"?
-						db.writeByte(0x0); // to make this "C" string. end with
-											// null character.
+						db.writeLong(fs.filesize); // filesize at open.
+						if (true) { // check if Filenames should be reported.
+							db.writeInt(dictID);// user_dictid
+							db.writeBytes(fs.filename.getBytes());// maybe
+																	// should be
+																	// forced to
+																	// "US-ASCII"?
+							db.writeByte(0x0); // to make this "C" string. end
+												// with
+												// null character.
+						}
+
+						// reset the first bit
+						fs.state &= 0xFFFE;
+						subpackets += 1;
 					}
 
-					// reset the first bit
-					fs.state &= 0xFFFE;
+					db.writeByte((byte) 3); // fileIO report
+					db.writeByte((byte) 0); // no meaning
+					db.writeShort(32); // 3*longlong + this header itself
+					db.writeInt(fs.fileId); // replace with dictid of the file
+					db.writeLong(fs.bytesRead.get());
+					db.writeLong(fs.bytesVectorRead.get());
+					db.writeLong(fs.bytesWritten.get());
+					plen += 32;
 					subpackets += 1;
+
+					if ((fs.state & 0x0004) > 0) { // add fileclose structure
+						// header
+						db.writeByte((byte) 0); // 0 - means isClose
+
+						db.writeByte((byte) closedetails);
+
+						int packlength = 8;
+						switch (closedetails) {
+						case 0:
+							packlength += 24;
+							break;
+						case 1:
+							// do nothing
+							break;
+						case 2:
+							packlength += 24 + 48;
+							break;
+						case 6:
+							packlength += 24 + 48 + 64;
+							break;
+						}
+
+						db.writeShort(packlength); // size of this header
+						db.writeInt(fs.fileId); // replace with dictid of the
+												// file
+
+						if (closedetails != 1) {
+							db.writeLong(fs.bytesRead.get());
+							db.writeLong(fs.bytesVectorRead.get());
+							db.writeLong(fs.bytesWritten.get());
+						}
+
+						if (closedetails > 1) { // OPS
+							db.writeInt(111); // reads
+							db.writeInt(112); // readVs
+							db.writeInt(113); // writes
+							db.writeShort(11); // shortest readv segments
+							db.writeShort(12); // longest readv segments
+							db.writeLong(123456); // number of readv segments
+							db.writeInt(111000); // rdMin
+							db.writeInt(112000); // rdMax
+							db.writeInt(113000); // rvMin
+							db.writeInt(111001); // rvMax
+							db.writeInt(112002); // wrMin
+							db.writeInt(113003); // wrMax
+						}
+
+						if (closedetails == 6) { // SSQ
+							db.writeLong(123456); // number of readv segments
+							db.writeDouble(123.123);
+							db.writeLong(123456); // number of readv segments
+							db.writeDouble(123.123);
+							db.writeLong(123456); // number of readv segments
+							db.writeDouble(123.123);
+							db.writeLong(123456); // number of readv segments
+							db.writeDouble(123.123);
+						}
+
+						// remove it
+						it.remove();
+						subpackets += 1;
+						plen += packlength;
+					}
+
 				}
 
-				db.writeByte((byte) 3); // fileIO report
-				db.writeByte((byte) 0); // no meaning
-				db.writeShort(32); // 3*longlong + this header itself
-				db.writeInt(fs.fileId); // replace with dictid of the file
-				db.writeLong(fs.bytesRead.get());
-				db.writeLong(fs.bytesVectorRead.get());
-				db.writeLong(fs.bytesWritten.get());
-				plen+=32;
-				subpackets += 1;
+				logger.debug("message length: " + plen + "\t buffer length:" + db.writableBytes());
+				db.setShort(2, plen);
+				db.setShort(14, subpackets);
 
-				if ((fs.state & 0x0004) > 0) { // add fileclose structure
-					// header
-					db.writeByte((byte) 0); // 0 - means isClose
-
-					db.writeByte((byte) closedetails);
-
-					int packlength = 8;
-					switch (closedetails) {
-					case 0:
-						packlength += 24;
-						break;
-					case 1:
-						// do nothing
-						break;
-					case 2:
-						packlength += 24 + 48;
-						break;
-					case 6:
-						packlength += 24 + 48 + 64;
-						break;
-					}
-
-					db.writeShort(packlength); // size of this header
-					db.writeInt(fs.fileId); // replace with dictid of the file
-
-					if (closedetails != 1) {
-						db.writeLong(fs.bytesRead.get());
-						db.writeLong(fs.bytesVectorRead.get());
-						db.writeLong(fs.bytesWritten.get());
-					} 
-					
-					if ( closedetails >1 ) { // OPS
-						db.writeInt(111); // reads
-						db.writeInt(112); // readVs
-						db.writeInt(113); // writes
-						db.writeShort(11); // shortest readv segments
-						db.writeShort(12); // longest readv segments
-						db.writeLong(123456); // number of readv segments
-						db.writeInt(111000); // rdMin
-						db.writeInt(112000); // rdMax
-						db.writeInt(113000); // rvMin
-						db.writeInt(111001); // rvMax
-						db.writeInt(112002); // wrMin
-						db.writeInt(113003); // wrMax
-					}
-
-					if (closedetails == 6) { //SSQ
-						db.writeLong(123456); // number of readv segments
-						db.writeDouble(123.123);
-						db.writeLong(123456); // number of readv segments
-						db.writeDouble(123.123);
-						db.writeLong(123456); // number of readv segments
-						db.writeDouble(123.123);
-						db.writeLong(123456); // number of readv segments
-						db.writeDouble(123.123);
-					}
-
-					// remove it
-					it.remove();
-					subpackets += 1;
-					plen += packlength;
+				ChannelFuture f = c.write(db, destination);
+				f.awaitUninterruptibly();
+				if (!f.isSuccess()) {
+					f.getCause().printStackTrace();
 				}
+				// else { logger.info("sent ok");}
+				f = c.close();
 
+			} catch (Exception e) {
+				logger.error("unrecognized exception in sending f-stream: " + e.getMessage());
 			}
-
-			logger.debug("message length: " + plen+"\t buffer length:"+db.writableBytes() );
-			db.setShort(2, plen);
-			db.setShort(14, subpackets);
-
-			ChannelFuture f = c.write(db, destination);
-			f.awaitUninterruptibly();
-			if (!f.isSuccess()) {
-				f.getCause().printStackTrace();
-			}
-			// else { logger.info("sent ok");}
-			f = c.close();
 		}
 
 	}
