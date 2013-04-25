@@ -110,7 +110,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					mode = 1;
 				else
 					mode = 0; // not correct
-				logger.warn("FILE OPEN REQUEST -------- connId:     " + connId);
+				logger.info("FILE OPEN REQUEST -------- connId:     " + connId);
 				logger.info("path:     " + or.getPath());
 				logger.info("readonly: " + mode);
 				FileStatistics fs = new FileStatistics(fileCounter);
@@ -126,7 +126,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			else if (message instanceof CloseRequest) {
 //				CloseRequest cr = (CloseRequest) message;
-				logger.warn("FILE CLOSE REQUEST ------- connId:     " + connId);
+				logger.info("FILE CLOSE REQUEST ------- connId:     " + connId);
 //				collector.closeEvent(connId, cr.getFileHandle());
 				collector.closeEvent(connId, connId);
 //				logger.info("------------------------------------");

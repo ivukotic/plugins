@@ -120,7 +120,7 @@ public class Collector {
 		// b.setOption("receiveBufferSizePredictorFactory", new
 		// FixedReceiveBufferSizePredictorFactory(1024));
 		// b.setOption("sendBufferSize",32000);
-		b.setOption("localAddress", new InetSocketAddress(9934));
+		b.setOption("localAddress", new InetSocketAddress(0));
 		b.setOption("broadcast", "true");
 		b.setOption("connectTimeoutMillis", 10000);
 
@@ -132,7 +132,7 @@ public class Collector {
 						new SimpleChannelUpstreamHandler());
 			}
 		});
-		b1.setOption("localAddress", new InetSocketAddress(9935));
+		b1.setOption("localAddress", new InetSocketAddress(0));
 		b1.setOption("broadcast", "true");
 		b1.setOption("connectTimeoutMillis", 10000);
 
@@ -363,7 +363,7 @@ public class Collector {
 		}
 
 		private void sendFstream() {
-			logger.debug("sending detailed stream");
+			logger.warn("sending detailed stream");
 			try {
 				fseq += 1;
 				DatagramChannel c = (DatagramChannel) b.bind();
