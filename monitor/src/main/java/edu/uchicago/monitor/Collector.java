@@ -57,6 +57,7 @@ public class Collector {
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap b;
 	private ConnectionlessBootstrap b1;
+	private ConnectionlessBootstrap b_MMSender;
 
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
 
@@ -109,8 +110,8 @@ public class Collector {
 		}
 
 		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
-		b = new ConnectionlessBootstrap(f);
 
+		b = new ConnectionlessBootstrap(f);
 		b.setPipelineFactory(new ChannelPipelineFactory() {
 			public ChannelPipeline getPipeline() throws Exception {
 				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
@@ -120,29 +121,43 @@ public class Collector {
 		// b.setOption("receiveBufferSizePredictorFactory", new
 		// FixedReceiveBufferSizePredictorFactory(1024));
 		// b.setOption("sendBufferSize",32000);
-		b.setOption("localAddress", new InetSocketAddress(0));
+		// b.setOption("localAddress", new InetSocketAddress(0));
 		b.setOption("broadcast", "true");
 		b.setOption("connectTimeoutMillis", 10000);
 
 		b1 = new ConnectionlessBootstrap(f);
-
 		b1.setPipelineFactory(new ChannelPipelineFactory() {
 			public ChannelPipeline getPipeline() throws Exception {
 				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
 						new SimpleChannelUpstreamHandler());
 			}
 		});
-		b1.setOption("localAddress", new InetSocketAddress(0));
+		// b1.setOption("localAddress", new InetSocketAddress(0));
 		b1.setOption("broadcast", "true");
 		b1.setOption("connectTimeoutMillis", 10000);
+
+		b_MMSender = new ConnectionlessBootstrap(f);
+		b_MMSender.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
+			}
+		});
+		b_MMSender.setOption("localAddress", new InetSocketAddress(0));
+		b_MMSender.setOption("broadcast", "true");
+		b_MMSender.setOption("connectTimeoutMillis", 10000);
 
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
+			b.setOption("localAddress", new InetSocketAddress(a.outboundport));
+			logger.warn("Setting detail monitoring local port (outbound) to: "+a.outboundport);
 		}
 		for (Address a : ca.detailed) {
 			Timer timer = new Timer();
 			timer.schedule(new SendDetailedStatisticsTask(a), 0, a.delay * 1000);
+			b1.setOption("localAddress", new InetSocketAddress(a.outboundport));
+			logger.warn("Setting summary monitoring local port (outbound) to: "+a.outboundport);
 		}
 	}
 
@@ -157,7 +172,11 @@ public class Collector {
 	}
 
 	public void closeEvent(int connectionId, int fh) {
-		logger.info(">>>Closed " + connectionId + "\n" + fmap.get(fh).toString());
+		logger.info("Close event. connectionID:" + connectionId + "file handle: " + fh);
+		if (fmap.get(fh) == null) {
+			logger.warn("File handle missing from the fmap. Should not happen except in case of recent restart. ");
+			return;
+		}
 		// if detailed monitoring is ON collector will remove it from map
 		if (ca.reportDetailed == false)
 			fmap.remove(fh);
@@ -260,7 +279,7 @@ public class Collector {
 		public void run() {
 			try {
 				fseq += 1;
-				DatagramChannel c = (DatagramChannel) b.bind();
+				DatagramChannel c = (DatagramChannel) b_MMSender.bind();
 				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=whatever";
 				content += authinfo;
 				short plen = (short) (12 + content.length());

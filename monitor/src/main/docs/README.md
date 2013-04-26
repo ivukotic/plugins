@@ -20,7 +20,7 @@ server available from http://github.com/gbehrmann/xrootd4j:
          --handler authn:none,edu.uchicago.monitor
 
 You may select several destinations to send collected information to. Each destination is given in form:
-<hostname>:<port>[:<interval>]
+<hostname>:<port>[:<interval>[:<outbound port>]]
 Interval signifies wait period in seconds between two consecutive sendings of information to that server.
 Replace values given with the real ones.
 
