@@ -5,7 +5,7 @@
 
 	<groupId>edu.uchicago.xrootd4j</groupId>
 	<artifactId>atlas-ns-mapping</artifactId>
-	<version>3.0.5</version>
+	<version>4.0.0</version>
 	<packaging>jar</packaging>
 
 	<name>My xrootd4j authorization and mapping plugin</name>
@@ -43,11 +43,6 @@
 			<version>${version.xrootd4j}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.slf4j</groupId>
-			<artifactId>slf4j-api</artifactId>
-			<version>1.7.2</version>
-		</dependency>
-		<dependency>
 			<groupId>org.dcache</groupId>
 			<artifactId>cog-jglobus</artifactId>
 			<version>1.8.0-1</version>
@@ -56,6 +51,16 @@
 			<groupId>nl.uva.vlet.glite.lfc</groupId>
 			<artifactId>vlet-glite.lfc</artifactId>
 			<version>1.0.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.json</groupId>
+			<artifactId>json</artifactId>
+			<version>20090211</version>
+		</dependency>
+		<dependency>
+			<groupId>log4j</groupId>
+			<artifactId>log4j</artifactId>
+			<version>1.2.14</version>
 		</dependency>
 	</dependencies>
 

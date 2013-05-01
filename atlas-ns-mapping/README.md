@@ -34,3 +34,11 @@ that way is now deprecated. Proper way is:
 you also need to add these two lines into dcache.conf:
     lfc_host=myLFChost
     srm_host=mySRMhost
+    
+this is required for sites supporting rucio:
+    site=rc_site
+    proper value for "rc_site" you may find here: http://atlas-agis-api.cern.ch/request/service/query/get_se_services/?json&flavour=XROOTD
+    
+probably never needed still if someone wants to hide a SpaceToken from FAX, just add this variable listing all of the space tokens you want exposed.
+    overwriteSE=/pnfs/uchicago.edu/atlasgroupdisk,/pnfs/uchicago.edu/atlasproddisk
+    

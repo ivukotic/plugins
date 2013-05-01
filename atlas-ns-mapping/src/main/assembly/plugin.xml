@@ -6,7 +6,6 @@
         <dependencySet>
             <excludes>
                 <exclude>org.dcache:xrootd4j:jar:*</exclude>
-                <exclude>org.slf4j:slf4j-api:jar:*</exclude> 
             </excludes>
             <useProjectArtifact>true</useProjectArtifact>
             <useTransitiveFiltering>true</useTransitiveFiltering>

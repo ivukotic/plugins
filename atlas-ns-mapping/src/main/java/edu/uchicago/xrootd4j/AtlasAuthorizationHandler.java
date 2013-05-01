@@ -24,12 +24,13 @@ import org.dcache.xrootd.plugins.AuthorizationHandler;
 import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
 import org.globus.gsi.GlobusCredential;
 import org.globus.gsi.GlobusCredentialException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+
+import org.apache.log4j.Logger;
+import org.apache.log4j.PropertyConfigurator;
 
 public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
-	final Logger logger = LoggerFactory.getLogger(AtlasAuthorizationHandler.class);
+	final private static Logger log = Logger.getLogger(AtlasAuthorizationHandler.class);
 	public URI lfcUri = null;
 
 	private LFCConfig config = null;
@@ -37,34 +38,41 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 	private String SRM_HOST = "";
 
 	String proxyFile = null;
-
+	
+	private RucioN2N rucio=null;
+	
 	public AtlasAuthorizationHandler(Properties properties) throws IllegalArgumentException, MissingResourceException {
 
+		PropertyConfigurator.configure(AtlasAuthorizationHandler.class.getClassLoader().getResource("log4j.properties"));
+		
 		LFC_HOST = properties.getProperty("lfc_host");
 		SRM_HOST = properties.getProperty("srm_host");
 
 		if (LFC_HOST == null) {
-			logger.error("*** Error: LFC_HOST parameter not defined. Please set it (in etc/dcache.conf) and restart the server.");
+			log.error("*** Error: LFC_HOST parameter not defined. Please set it (in etc/dcache.conf) and restart the server.");
 			throw new IllegalArgumentException("LFC_HOST parameter not defined. Please set it (in etc/dcache.conf) and restart the server.");
 		} else {
-			logger.info("Setting LFC_HOST to: " + LFC_HOST);
+			log.info("Setting LFC_HOST to: " + LFC_HOST);
 		}
 
 		if (SRM_HOST == null) {
-			logger.error("*** Error: SRM_HOST parameter not defined. Please set it (in etc/dcache.conf)  and restart the server.");
+			log.error("*** Error: SRM_HOST parameter not defined. Please set it (in etc/dcache.conf)  and restart the server.");
 			throw new IllegalArgumentException("SRM_HOST parameter not defined. Please set it (in etc/dcache.conf) and restart the server.");
 		} else {
-			logger.info("Setting SRM_HOST to: " + SRM_HOST);
+			log.info("Setting SRM_HOST to: " + SRM_HOST);
 		}
 		try {
 			config = new LFCConfig();
-			 logger.info("trying to get proxy...");
+			log.info("trying to get proxy...");
 			 config.globusCredential = getValidProxy();
 		} catch (Exception e) {
-			logger.info("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access and you have gLite.");
-			logger.debug(e.getMessage());
+			log.info("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access and you have gLite.");
+			log.debug(e.getMessage());
 			config = null;
 		}
+		
+		rucio=new RucioN2N(properties);
+		
 	}
 
 	public GlobusCredential getValidProxy() {
@@ -72,34 +80,34 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		// custom proxy
 		if (proxyFile != null) {
-			logger.info("Using proxy from:" + proxyFile);
+			log.info("Using proxy from:" + proxyFile);
 			try {
 				cred = new GlobusCredential(proxyFile);
 			} catch (GlobusCredentialException e) {
-				logger.error("*** Error: problem when getting credential from file: " + proxyFile+"\n"+e.getMessage());
+				log.error("*** Error: problem when getting credential from file: " + proxyFile+"\n"+e.getMessage());
 				throw new MissingResourceException("*** Error: problem when getting credential from file: " + proxyFile, "GlobusCredential", "");
 			}
 		} else {
-			logger.info("Using default proxy file.");
+			log.info("Using default proxy file.");
 			try {
 				cred = GlobusCredential.getDefaultCredential();
 			} catch (GlobusCredentialException e) {
-				logger.warn("*** Can't get default proxy. "+e.getMessage());
+				log.warn("*** Can't get default proxy. "+e.getMessage());
 				throw new MissingResourceException("*** Can't get default proxy.", "GlobusCredential", "");
 			}
 		}
 
 		if (cred == null) {
-			logger.error("Couldn't find valid proxy");
+			log.error("Couldn't find valid proxy");
 			throw new MissingResourceException("*** Error: no valid default proxy.", "GlobusCredential", "");
 		}
 
 		if (cred.getTimeLeft() <= 0) {
-			logger.error("Expired Credential detected.");
+			log.error("Expired Credential detected.");
 			throw new MissingResourceException("*** Error: Expired Credential detected.", "GlobusCredential", "");
 		}
 
-		logger.info("proxy timeleft=" + cred.getTimeLeft());
+		log.info("proxy timeleft=" + cred.getTimeLeft());
 
 		return cred;
 	}
@@ -108,7 +116,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 	public String authorize(Subject subject, InetSocketAddress localAddress, InetSocketAddress remoteAddress, String path, Map<String, String> opaque,
 			int request, FilePerm mode) throws SecurityException, GeneralSecurityException {
 
-		logger.info("GOT to translate: " + path);
+		log.info("GOT to translate: " + path);
 
 		if (path.startsWith("pnfs/")) {
 			return path;
@@ -116,14 +124,18 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		String LFN = path;
 		if (!LFN.startsWith("/atlas/")) {
-			logger.error("*** Error: LFN must start with /atlas/. ");
+			log.error("*** Error: LFN must start with /atlas/. ");
 			return "";
 		}
 
+		if (!LFN.startsWith("/atlas/rucio/")){
+			return rucio.translate(LFN);
+		}
+		
 		String sLFN = "lfn://grid" + LFN;
 		LFN = "lfn://" + LFC_HOST + "//grid" + LFN;
 
-		logger.info("FINALY translating: " + LFN);
+		log.info("FINALY translating: " + LFN);
 
 		if (config != null) { // access through API
 
@@ -132,20 +144,20 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 			try {
 				lfcUri = new URI(LFN);
-				logger.debug("Is a proper url.");
+				log.debug("Is a proper url.");
 			} catch (URISyntaxException e) {
-				logger.error("*** Error: Invalid URI:" + LFN);
-				logger.error(e.getMessage());
+				log.error("*** Error: Invalid URI:" + LFN);
+				log.error(e.getMessage());
 				return "";
 			}
 
 			LFCServer lfcServer;
 			try {
 				lfcServer = new LFCServer(config, lfcUri);
-				logger.debug("LFC server created.");
+				log.debug("LFC server created.");
 			} catch (Exception e) {
-				logger.error("*** Could not connect to LFC. Giving up.");
-				logger.error(e.getMessage());
+				log.error("*** Could not connect to LFC. Giving up.");
+				log.error(e.getMessage());
 				return "";
 			}
 
@@ -155,7 +167,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			if (gu > 0) {
 				guid = LFN.substring(gu + 5);
 				if (guid.length() != 36) {
-					logger.error("*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
+					log.error("*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
 					return "";
 				}
 			} else {
@@ -163,57 +175,57 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				try {
 					entry = lfcServer.fetchFileDesc(lfcUri.getPath());
 				} catch (Exception e) {
-					logger.error("*** Can't get file description for entry: " + lfcUri.getPath());
-					logger.error("*** Can't get file description for entry: " + e.getMessage());
+					log.error("*** Can't get file description for entry: " + lfcUri.getPath());
+					log.error("*** Can't get file description for entry: " + e.getMessage());
 				}
 
 				if (entry.getGuid() == null && LFN.contains("/user/")) {
-					logger.info("maybe this is pathena registered file. Trying that...");
+					log.info("maybe this is pathena registered file. Trying that...");
 					entry = ifInputIsPathenaRegistered(lfcUri.getPath(), lfcServer);
 				}
 
 				if (entry.getGuid() == null) {
-					logger.info("maybe got container and not dataset. Trying that...");
+					log.info("maybe got container and not dataset. Trying that...");
 					entry = ifInputIsContainerDS(lfcUri.getPath(), lfcServer);
 				}
 
 				if (!entry.isFile()) {
-					logger.error("*** Error: No such file or not a file.");
+					log.error("*** Error: No such file or not a file.");
 					return "";
 				}
 				guid = entry.getGuid();
 			}
 
-			logger.debug("guid:" + guid);
+			log.debug("guid:" + guid);
 
 			try {
 				ArrayList<ReplicaDesc> replicas = lfcServer.getReplicas(guid);
 				if (replicas.isEmpty()) {
-					logger.info("*** Error: No replica exists in this LFC.");
+					log.info("*** Error: No replica exists in this LFC.");
 					return "";
 				} else {
 					String PFN = "";
-					logger.debug("found " + replicas.size() + " replicas.");
+					log.debug("found " + replicas.size() + " replicas.");
 					for (ReplicaDesc replica : replicas) {
 						String line = replica.getSfn();
 						if (replica.getHost().equals(SRM_HOST)) {
-							logger.debug("replica found \n " + replica.toString());
+							log.debug("replica found \n " + replica.toString());
 							int li = line.lastIndexOf("=") + 1;
 							if (li < 1) {
-								logger.debug("could not find = sign. looking for /pnfs");
+								log.debug("could not find = sign. looking for /pnfs");
 								li = line.indexOf("/pnfs/");
 							}
 							PFN = line.substring(li);
-							logger.info("PFN: " + PFN);
+							log.info("PFN: " + PFN);
 							return PFN;
 						}
 					}
-					logger.error("*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
+					log.error("*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
 					return "";
 				}
 			} catch (Exception e) {
-				logger.error("*** Error: Can't get list of Replicas.");
-				logger.error(e.getMessage());
+				log.error("*** Error: Can't get list of Replicas.");
+				log.error(e.getMessage());
 				return "";
 			}
 
@@ -221,7 +233,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		else { // access through lcg-lr
 
-			logger.info("Trying to use lcg-lr " + sLFN);
+			log.info("Trying to use lcg-lr " + sLFN);
 			ProcessBuilder pb = new ProcessBuilder("lcg-lr", sLFN, "--connect-timeout", "10");
 			Map<String, String> env = pb.environment();
 			env.put("LFC_HOST", LFC_HOST);
@@ -233,28 +245,28 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				String line;
 				String PFN;
 				while ((line = br.readLine()) != null) {
-					// logger.error(line);
+					// log.error(line);
 					if (line.indexOf(SRM_HOST) == -1)
 						continue;
 					Integer ind = line.indexOf("=") + 1;
 					if (ind > 0) { // long form
 						PFN = line.substring(ind);
-						logger.error("PFN: " + PFN);
+						log.error("PFN: " + PFN);
 						return PFN;
 					}
 					ind = line.indexOf("/", 6);
 					if (ind > 0) { // short form
 						PFN = line.substring(ind);
-						logger.error("PFN: " + PFN);
+						log.error("PFN: " + PFN);
 						return PFN;
 					}
-					logger.error("Could not interpret LFC name: " + line);
+					log.error("Could not interpret LFC name: " + line);
 					return line;
 				}
-				// logger.error("lcg-lr returned.");
+				// log.error("lcg-lr returned.");
 
 			} catch (IOException e) {
-				logger.error("IO Exception: " + e.getMessage());
+				log.error("IO Exception: " + e.getMessage());
 			}
 
 		}
@@ -264,38 +276,38 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 	public FileDesc ifInputIsContainerDS(String path, LFCServer lfcServer) {
 		FileDesc entry = new FileDesc();
-		logger.debug("path -> " + path);
+		log.debug("path -> " + path);
 		path = path.replaceAll("\\b//\\b", "/");
-		logger.debug("stripped path -> " + path);
+		log.debug("stripped path -> " + path);
 
 		int li = path.lastIndexOf("/");
 		String fn = path.substring(li + 1);
-		logger.debug("filename -> " + fn);
+		log.debug("filename -> " + fn);
 
 		path = path.substring(0, li); // no filename
 		li = path.lastIndexOf("/");
 		String DSname = path.substring(li + 1);
-		logger.debug("dsname -> " + DSname);
+		log.debug("dsname -> " + DSname);
 		String dirname = path.substring(0, li);
-		logger.debug("dir -> " + dirname);
+		log.debug("dir -> " + dirname);
 
 		try {
 			ArrayList<FileDesc> dirsdescs = lfcServer.listDirectory(dirname);
-			logger.debug("got list of " + dirsdescs.size() + " data sets in this container.");
+			log.debug("got list of " + dirsdescs.size() + " data sets in this container.");
 			for (FileDesc dirdesc : dirsdescs) {
-				logger.debug(dirdesc.getFileName());
+				log.debug(dirdesc.getFileName());
 				if (dirdesc.getFileName().indexOf(DSname) != -1) {
 					String newFN = dirname + "/" + dirdesc.getFileName() + "/" + fn;
-					logger.debug("found matching DS! trying: " + newFN);
+					log.debug("found matching DS! trying: " + newFN);
 					try {
 						return lfcServer.fetchFileDesc(newFN);
 					} catch (Exception e) {
-						logger.error("*** Not this one.");
+						log.error("*** Not this one.");
 					}
 				}
 			}
 		} catch (Exception e1) {
-			logger.info("***  There is no dataset container named: " + dirname);
+			log.info("***  There is no dataset container named: " + dirname);
 			return entry;
 		}
 		return entry;
@@ -304,15 +316,15 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 	public FileDesc ifInputIsPathenaRegistered(String path, LFCServer lfcServer) {
 		FileDesc entry = new FileDesc();
 		path = path.replaceAll("\\b//\\b", "/");
-		logger.debug("stripped path -> " + path);
+		log.debug("stripped path -> " + path);
 
 		path = path.replace("user", "users/pathena");
-		logger.debug("filename changed to pathena one -> " + path);
+		log.debug("filename changed to pathena one -> " + path);
 
 		try {
 			entry = lfcServer.fetchFileDesc(lfcUri.getPath());
 		} catch (Exception e1) {
-			logger.info("*** It did not work. ");
+			log.info("*** It did not work. ");
 			return entry;
 		}
 		return entry;
