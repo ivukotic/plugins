@@ -89,8 +89,6 @@ public class RucioN2N {
 			log.error("JSONException when reading space_token info from AGIS.");
 			e.printStackTrace();
 		}
-
-		map.clear();
 		
 		if (map.size() == 0) {
 			log.warn("Fallback to reading from backup site.");
