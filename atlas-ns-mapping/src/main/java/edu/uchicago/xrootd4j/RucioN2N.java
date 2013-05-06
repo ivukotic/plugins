@@ -119,7 +119,7 @@ public class RucioN2N {
 		}
 
 		printCounts();
-
+		log.info("Rucio setup properly.");
 	}
 
 	public static JSONArray readJsonFromUrl(String url) throws IOException, JSONException {
