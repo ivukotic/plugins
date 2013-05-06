@@ -64,7 +64,7 @@ public class RucioN2N {
 
 		JSONArray json;
 		try {
-			json = readJsonFromUrl("http://atlas-agis-api-dev.cern.ch/request/service/query/get_se_services/?json&flavour=XROOTD");
+			json = readJsonFromUrl("http://atlas-agis-api.cern.ch/request/service/query/get_se_services/?json&flavour=XROOTD");
 			log.debug(json.toString());
 			for (int ind = 0; ind < json.length(); ind++) {
 				JSONObject site = json.getJSONObject(ind);
