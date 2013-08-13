@@ -25,10 +25,11 @@ import org.jboss.netty.channel.WriteCompletionEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
 public class MonitorChannelHandler extends SimpleChannelHandler {
 
-	final Logger logger = LoggerFactory.getLogger(MonitorChannelHandler.class);
-
+	final static Logger logger = LoggerFactory.getLogger(MonitorChannelHandler.class);
+	
 	private final Collector collector;
 	private int connId = 0;
 	private static int fileCounter = 100;
@@ -40,7 +41,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	@Override
 	public void handleUpstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
-		// logger.debug("UP mess:"+ e.toString());
+		logger.debug("UP mess:"+ e.toString());
 
 		if (e instanceof MessageEvent) {
 			// logger.info("MessageEvent UP");
@@ -129,7 +130,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				fs.mode = mode;
 				collector.fmap.put(-connId, fs);
 				collector.SendMapMessage(connId, "ivukotic.12345:" + connId + "@mycomputer");
-				// collector.sendMyMessage(connId,"ivukotic.12345:"+connId+"@mycomputer");
 				// logger.info("------------------------------------");
 			}
 
@@ -203,7 +203,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		else { // completely impossible
 			logger.info("Monitor not handling this kind of message. UP");
 		}
-
+		
 		super.handleUpstream(ctx, e);
 	}
 
@@ -259,7 +259,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			else if (message instanceof OpenResponse) {
 				OpenResponse OR = (OpenResponse) message;
-//				Integer streamID = OR.getRequest().getStreamId();
+				// Integer streamID = OR.getRequest().getStreamId();
 				// logger.info("FILE OPEN RESPONSE --------- stream Id: " +
 				// streamID);
 				// logger.info("filehandle: " + OR.getFileHandle());

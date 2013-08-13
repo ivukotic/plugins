@@ -1,11 +1,12 @@
 package edu.uchicago.monitor;
 
-public class Address {
 
+public class Address {
+	
 	public String address;
 	public int port;
 	public int delay;
-	public int outboundport;
+	public int outboundport=0;
 
 	Address(String param) throws IllegalArgumentException {
 		String[] temp;

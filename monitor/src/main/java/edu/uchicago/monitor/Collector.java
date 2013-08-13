@@ -21,6 +21,7 @@ import org.jboss.netty.buffer.ChannelBuffer;
 import static org.jboss.netty.buffer.ChannelBuffers.*;
 
 import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
@@ -36,8 +37,8 @@ import org.slf4j.LoggerFactory;
 
 public class Collector {
 
-	final Logger logger = LoggerFactory.getLogger(Collector.class);
-
+	final static Logger logger = LoggerFactory.getLogger(Collector.class);
+	
 	private String servername;
 	private Properties properties;
 
@@ -55,9 +56,9 @@ public class Collector {
 	private byte fseq = 0;
 
 	private DatagramChannelFactory f;
-	private ConnectionlessBootstrap b;
-	private ConnectionlessBootstrap b1;
-	private ConnectionlessBootstrap b_MMSender;
+	private ConnectionlessBootstrap cbsSummary;
+	private ConnectionlessBootstrap cbsDetailed;
+	private ConnectionlessBootstrap cbsMMSender;
 
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
 
@@ -111,54 +112,67 @@ public class Collector {
 
 		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
 
-		b = new ConnectionlessBootstrap(f);
-		b.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
-		// b.setOption("receiveBufferSizePredictorFactory", new
-		// FixedReceiveBufferSizePredictorFactory(1024));
-		// b.setOption("sendBufferSize",32000);
-		// b.setOption("localAddress", new InetSocketAddress(0));
-		b.setOption("broadcast", "true");
-		b.setOption("connectTimeoutMillis", 10000);
+		
+		
+		
+		// this one is for sending summary data
 
-		b1 = new ConnectionlessBootstrap(f);
-		b1.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
-		// b1.setOption("localAddress", new InetSocketAddress(0));
-		b1.setOption("broadcast", "true");
-		b1.setOption("connectTimeoutMillis", 10000);
-
-		b_MMSender = new ConnectionlessBootstrap(f);
-		b_MMSender.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
-		b_MMSender.setOption("localAddress", new InetSocketAddress(0));
-		b_MMSender.setOption("broadcast", "true");
-		b_MMSender.setOption("connectTimeoutMillis", 10000);
+		cbsSummary = new ConnectionlessBootstrap(f);
+//		 cbsSummary.setOption("receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory(512));
+		// cbsSummary.setOption("sendBufferSize",32000);
+		cbsSummary.setOption("localAddress", new InetSocketAddress(0));
+		cbsSummary.setOption("broadcast", "true");
+		cbsSummary.setOption("connectTimeoutMillis", 10000);
 
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
-			b.setOption("localAddress", new InetSocketAddress(a.outboundport));
-			logger.warn("Setting detail monitoring local port (outbound) to: "+a.outboundport);
+			cbsSummary.setOption("localAddress", new InetSocketAddress(a.outboundport));
+			logger.info("Setting summary monitoring local port (outbound) to: " + a.outboundport);
 		}
+
+		cbsSummary.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
+			}
+		});
+
+		// this one are detailed
+
+		cbsDetailed = new ConnectionlessBootstrap(f);
+		cbsDetailed.setOption("localAddress", new InetSocketAddress(0));
+		cbsDetailed.setOption("broadcast", "true");
+		cbsDetailed.setOption("connectTimeoutMillis", 10000);
+
 		for (Address a : ca.detailed) {
 			Timer timer = new Timer();
 			timer.schedule(new SendDetailedStatisticsTask(a), 0, a.delay * 1000);
-			b1.setOption("localAddress", new InetSocketAddress(a.outboundport));
-			logger.warn("Setting summary monitoring local port (outbound) to: "+a.outboundport);
+			cbsDetailed.setOption("localAddress", new InetSocketAddress(a.outboundport));
+			logger.info("Setting detailed monitoring local port (outbound) to: " + a.outboundport);
 		}
+
+		cbsDetailed.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
+			}
+		});
+
+		// this one is for mapping messages
+
+		cbsMMSender = new ConnectionlessBootstrap(f);
+		cbsMMSender.setOption("localAddress", new InetSocketAddress(0));
+		cbsMMSender.setOption("broadcast", "true");
+		cbsMMSender.setOption("connectTimeoutMillis", 10000);
+
+		cbsMMSender.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
+			}
+		});
+
 	}
 
 	public void addConnectionAttempt() {
@@ -167,12 +181,12 @@ public class Collector {
 
 	public void openEvent(int connectionId, FileStatistics fs) {
 		// Note that status may be null - only available if client requested it
-		logger.info(">>>Opened " + connectionId + "\n" + fs.toString());
+		logger.debug(">>>Opened " + connectionId + "\n" + fs.toString());
 		fs.state |= 0x0011; // set first and second bit
 	}
 
 	public void closeEvent(int connectionId, int fh) {
-		logger.info("Close event. connectionID:" + connectionId + "file handle: " + fh);
+		logger.debug(">>>Closed " + connectionId + "  file handle: " + fh);
 		if (fmap.get(fh) == null) {
 			logger.warn("File handle missing from the fmap. Should not happen except in case of recent restart. ");
 			return;
@@ -186,13 +200,13 @@ public class Collector {
 
 	public void connectedEvent(int connectionId, SocketAddress remoteAddress) {
 		currentConnections.getAndIncrement();
-		logger.info(">>>Connected " + connectionId + " " + remoteAddress);
+		logger.debug(">>>Connected " + connectionId + " " + remoteAddress);
 	}
 
 	public void disconnectedEvent(int connectionId, long duration) {
 		currentConnections.getAndDecrement();
 		successfulConnections.getAndIncrement();
-		logger.info(">>>Disconnected " + connectionId + " " + duration + "ms");
+		logger.debug(">>>Disconnected " + connectionId + " " + duration + "ms");
 	}
 
 	@Override
@@ -209,62 +223,15 @@ public class Collector {
 	}
 
 	public void SendMapMessage(Integer dictid, String content) {
-		logger.info("sending map message: " + content);
+		logger.debug("sending map message: " + content);
 		for (Address a : ca.detailed) {
 			MapMessagesSender mms = new MapMessagesSender(a, dictid, content);
 			mms.start();
 		}
 	}
 
-	// public void sendMyMessage(Integer dictid, String content) {
-	// for (Address a : ca.detailed) {
-	// InetSocketAddress destination = new InetSocketAddress(a.address, a.port);
-	// try {
-	// DatagramChannel c = (DatagramChannel) b.bind();
-	// String authinfo =
-	// "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=fuck";
-	// content += authinfo;
-	//
-	// logger.info("sending map message: " + content);
-	// short plen = (short) (12 + content.length());
-	// ChannelBuffer db = dynamicBuffer(plen);
-	//
-	// // main header
-	// db.writeByte((byte) 117); // 'u'
-	// db.writeByte((byte) fseq);
-	// db.writeShort(plen);
-	// db.writeInt(tos);
-	// db.writeInt(dictid); // this is dictID
-	// db.writeBytes(content.getBytes());
-	// ChannelFuture f = c.write(db, destination);
-	//
-	// f.addListener(new ChannelFutureListener() {
-	// public void operationComplete(ChannelFuture future) throws Exception {
-	// if (future.isSuccess()) {
-	// logger.debug("OK sent. ");
-	// } else {
-	// logger.error("NOT sent. ");
-	// }
-	// }
-	// });
-	//
-	// ChannelFuture f1 = c.close();
-	// f1.addListener(new ChannelFutureListener() {
-	// public void operationComplete(ChannelFuture future) throws Exception {
-	// if (future.isSuccess()) {
-	// logger.debug("Connection CLOSED. ");
-	// } else {
-	// logger.error("Connection NOT CLOSED. ");
-	// }
-	// }
-	// });
-	//
-	// } catch (Exception e) {
-	// logger.error("unrecognized exception: " + e.getMessage());
-	// }
-	// }
-	// }
 
+	
 	private class MapMessagesSender extends Thread {
 		private InetSocketAddress destination;
 		private Integer dictid;
@@ -277,9 +244,10 @@ public class Collector {
 		}
 
 		public void run() {
+			logger.debug("Sending Map Message.");
 			try {
 				fseq += 1;
-				DatagramChannel c = (DatagramChannel) b_MMSender.bind();
+				DatagramChannel c = (DatagramChannel) cbsMMSender.bind();
 				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=whatever";
 				content += authinfo;
 				short plen = (short) (12 + content.length());
@@ -294,36 +262,17 @@ public class Collector {
 				db.writeBytes(content.getBytes());
 				ChannelFuture f = c.write(db, destination);
 
-				f.awaitUninterruptibly();
-				if (!f.isSuccess()) {
-					f.getCause().printStackTrace();
-				} else {
-					logger.info("MAP MSG sent ok");
-				}
-				c.close();
-
-				// f.addListener(new ChannelFutureListener() {
-				// public void operationComplete(ChannelFuture future) throws
-				// Exception {
-				// if (future.isSuccess()) {
-				// logger.debug("OK sent. ");
-				// } else {
-				// logger.error("NOT sent. ");
-				// }
-				// }
-				// });
-				//
-				// ChannelFuture f1=c.close();
-				// f1.addListener(new ChannelFutureListener() {
-				// public void operationComplete(ChannelFuture future) throws
-				// Exception {
-				// if (future.isSuccess()) {
-				// logger.debug("Connection CLOSED. ");
-				// } else {
-				// logger.error("Connection NOT CLOSED. ");
-				// }
-				// }
-				// });
+				f.addListener(new ChannelFutureListener(){
+		             public void operationComplete(ChannelFuture future) {
+		                 if (future.isSuccess()) 
+		                	 logger.debug("Map Message IO completed. success!");
+		                 else {
+		                	 logger.error("Map Message IO completed. did not send info:"+future.getCause());
+		                 }
+		                 future.getChannel().close(); 
+		             }
+				} 
+				);
 
 			} catch (Exception e) {
 				logger.error("unrecognized exception: " + e.getMessage());
@@ -332,18 +281,23 @@ public class Collector {
 
 	}
 
+	
+	
+	
+	
+	
 	private class SendSummaryStatisticsTask extends TimerTask {
+		private InetSocketAddress destination;
 		private String info;
-		private Address a;
 
 		SendSummaryStatisticsTask(Address a) {
-			this.a = a;
+			destination = new InetSocketAddress(a.address, a.port);
 			info = "<stats id=\"info\"><host>" + servername + "</host><port>" + a.port + "</port><name>anon</name></stats>";
 		}
 
 		public void run() {
 			try {
-				logger.info("sending summary stream");
+				logger.debug("sending summary stream");
 
 				long tod = System.currentTimeMillis() / 1000L - 60;
 				String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
@@ -351,24 +305,36 @@ public class Collector {
 						+ totBytesRead.toString() + "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
 				String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
 						+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
-				// logger.info(xmlmessage);
+				logger.debug(xmlmessage);
+				
+				DatagramChannel c = (DatagramChannel) cbsSummary.bind();
 
-				DatagramChannel c = (DatagramChannel) b1.bind();
-
-				ChannelFuture f = c.write(xmlmessage, new InetSocketAddress(a.address, a.port));
-
-				f.awaitUninterruptibly();
-				if (!f.isSuccess()) {
-					f.getCause().printStackTrace();
-				}
-				// else { logger.info("sent ok"); }
-				c.close();
+				
+				ChannelFuture f = c.write(xmlmessage, destination);
+				f.addListener(new ChannelFutureListener(){
+		             public void operationComplete(ChannelFuture future) {
+		                 if (future.isSuccess()) 
+		                	 logger.debug("summary stream IO completed. success!");
+		                 else {
+		                	 logger.error("summary stream IO completed. did not send info:"+future.getCause());
+		                 }
+		                 future.getChannel().close(); 
+		             }
+				} 
+				);
+				
+				
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending summary stream: " + e.getMessage());
 			}
 		}
 	}
 
+	
+	
+	
+	
+	
 	private class SendDetailedStatisticsTask extends TimerTask {
 		private InetSocketAddress destination;
 
@@ -382,10 +348,10 @@ public class Collector {
 		}
 
 		private void sendFstream() {
-			logger.warn("sending detailed stream");
+			logger.debug("sending detailed stream");
 			try {
 				fseq += 1;
-				DatagramChannel c = (DatagramChannel) b.bind();
+				DatagramChannel c = (DatagramChannel) cbsDetailed.bind();
 
 				logger.debug("fmap size: " + fmap.size());
 				short plen = (short) (24); // this is length of 2 mandatory
@@ -536,12 +502,17 @@ public class Collector {
 				db.setShort(14, subpackets);
 
 				ChannelFuture f = c.write(db, destination);
-				f.awaitUninterruptibly();
-				if (!f.isSuccess()) {
-					f.getCause().printStackTrace();
-				}
-				// else { logger.info("sent ok");}
-				f = c.close();
+				f.addListener(new ChannelFutureListener(){
+		             public void operationComplete(ChannelFuture future) {
+		                 if (future.isSuccess()) 
+		                	 logger.debug("detailed stream IO completed. success!");
+		                 else {
+		                	 logger.error("detailed stream IO completed. did not send info:"+future.getCause());
+		                 }
+		                 future.getChannel().close(); 
+		             }
+				} 
+				);
 
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending f-stream: " + e.getMessage());

@@ -6,13 +6,15 @@ import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+
+
 public class CollectorAddresses {
 
+	final static Logger logger = LoggerFactory.getLogger(CollectorAddresses.class);
 	public ArrayList<Address> summary = new ArrayList<Address>();
 	public ArrayList<Address> detailed = new ArrayList<Address>();
 	public boolean reportSummary = false;
 	public boolean reportDetailed = false;
-	final Logger logger = LoggerFactory.getLogger(CollectorAddresses.class);
 
 	CollectorAddresses() {
 	}

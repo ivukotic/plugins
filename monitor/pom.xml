@@ -4,10 +4,10 @@
 
   <groupId>edu.uchicago</groupId>
   <artifactId>monitor</artifactId>
-  <version>4.6.3</version>
+  <version>4.6.5</version>
   <packaging>jar</packaging>
 
-  <name>My xrootd4j channel handler plugin</name>
+  <name>ATLAS dCache xrootd monitor</name>
 
   <licenses>
       <license>
@@ -42,9 +42,9 @@
         <version>${version.xrootd4j}</version>
     </dependency>
     <dependency>
-    	<groupId>org.slf4j</groupId>
-    	<artifactId>slf4j-api</artifactId>
-    	<version>1.7.2</version>
+    	<groupId>ch.qos.logback</groupId>
+    	<artifactId>logback-classic</artifactId>
+    	<version>1.0.9</version>
     </dependency>
   </dependencies>
 
