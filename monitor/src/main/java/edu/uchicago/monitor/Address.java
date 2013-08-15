@@ -44,6 +44,6 @@ public class Address {
 
 	@Override
 	public String toString() {
-		return "Hostname: " + address + "\t port: " + port + ".\t Sending each " + delay + " seconds. Outbound port" + outboundport + "\n";
+		return "Hostname: " + address + "\t port: " + port + ".\t Sending each " + delay + " seconds. Outbound port: " + outboundport + "\n";
 	}
 }

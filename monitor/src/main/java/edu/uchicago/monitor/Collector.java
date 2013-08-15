@@ -22,15 +22,19 @@ import static org.jboss.netty.buffer.ChannelBuffers.*;
 
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
+import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.MessageEvent;
+import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.socket.DatagramChannel;
 import org.jboss.netty.channel.socket.DatagramChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioDatagramChannelFactory;
 import org.jboss.netty.handler.codec.string.StringDecoder;
 import org.jboss.netty.handler.codec.string.StringEncoder;
+import org.jboss.netty.handler.logging.LoggingHandler;
 import org.jboss.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,7 +63,8 @@ public class Collector {
 	private ConnectionlessBootstrap cbsSummary;
 	private ConnectionlessBootstrap cbsDetailed;
 	private ConnectionlessBootstrap cbsMMSender;
-
+	private DatagramChannel dcMM;
+	
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
@@ -69,7 +74,6 @@ public class Collector {
 	public AtomicLong totBytesWriten = new AtomicLong();
 	private CollectorAddresses ca = new CollectorAddresses();
 
-	// Timer timer = new Timer();
 
 	Collector(Properties properties) {
 		this.properties = properties;
@@ -110,20 +114,26 @@ public class Collector {
 			pid = 123456;
 		}
 
-		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
-
 		
+		
+		
+		
+		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
 		
 		
 		// this one is for sending summary data
-
 		cbsSummary = new ConnectionlessBootstrap(f);
-//		 cbsSummary.setOption("receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory(512));
-		// cbsSummary.setOption("sendBufferSize",32000);
 		cbsSummary.setOption("localAddress", new InetSocketAddress(0));
 		cbsSummary.setOption("broadcast", "true");
 		cbsSummary.setOption("connectTimeoutMillis", 10000);
 
+		cbsSummary.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1), 
+						        new SimpleChannelUpstreamHandler());
+			}
+		});
+		
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
@@ -131,12 +141,7 @@ public class Collector {
 			logger.info("Setting summary monitoring local port (outbound) to: " + a.outboundport);
 		}
 
-		cbsSummary.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
+
 
 		// this one are detailed
 
@@ -144,7 +149,17 @@ public class Collector {
 		cbsDetailed.setOption("localAddress", new InetSocketAddress(0));
 		cbsDetailed.setOption("broadcast", "true");
 		cbsDetailed.setOption("connectTimeoutMillis", 10000);
-
+		
+		cbsDetailed.setPipelineFactory(new ChannelPipelineFactory() {
+			public ChannelPipeline getPipeline() throws Exception {
+				return Channels.pipeline(
+//						new StringEncoder(CharsetUtil.ISO_8859_1), 
+//						new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler()
+						);
+			}
+		});
+		
 		for (Address a : ca.detailed) {
 			Timer timer = new Timer();
 			timer.schedule(new SendDetailedStatisticsTask(a), 0, a.delay * 1000);
@@ -152,12 +167,7 @@ public class Collector {
 			logger.info("Setting detailed monitoring local port (outbound) to: " + a.outboundport);
 		}
 
-		cbsDetailed.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
+
 
 		// this one is for mapping messages
 
@@ -172,9 +182,12 @@ public class Collector {
 						new SimpleChannelUpstreamHandler());
 			}
 		});
-
+ 
+		dcMM = (DatagramChannel) cbsMMSender.bind();
 	}
 
+
+	
 	public void addConnectionAttempt() {
 		connectionAttempts.getAndIncrement();
 	}
@@ -236,7 +249,7 @@ public class Collector {
 		private InetSocketAddress destination;
 		private Integer dictid;
 		private String content;
-
+		
 		MapMessagesSender(Address a, Integer dictid, String content) {
 			destination = new InetSocketAddress(a.address, a.port);
 			this.dictid = dictid;
@@ -247,7 +260,7 @@ public class Collector {
 			logger.debug("Sending Map Message.");
 			try {
 				fseq += 1;
-				DatagramChannel c = (DatagramChannel) cbsMMSender.bind();
+				
 				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=whatever";
 				content += authinfo;
 				short plen = (short) (12 + content.length());
@@ -260,7 +273,7 @@ public class Collector {
 				db.writeInt(tos);
 				db.writeInt(dictid); // this is dictID
 				db.writeBytes(content.getBytes());
-				ChannelFuture f = c.write(db, destination);
+				ChannelFuture f = dcMM.write(db, destination);
 
 				f.addListener(new ChannelFutureListener(){
 		             public void operationComplete(ChannelFuture future) {
@@ -269,7 +282,6 @@ public class Collector {
 		                 else {
 		                	 logger.error("Map Message IO completed. did not send info:"+future.getCause());
 		                 }
-		                 future.getChannel().close(); 
 		             }
 				} 
 				);
@@ -289,8 +301,10 @@ public class Collector {
 	private class SendSummaryStatisticsTask extends TimerTask {
 		private InetSocketAddress destination;
 		private String info;
-
+		private DatagramChannel c;
+		
 		SendSummaryStatisticsTask(Address a) {
+			c = (DatagramChannel) cbsSummary.bind();
 			destination = new InetSocketAddress(a.address, a.port);
 			info = "<stats id=\"info\"><host>" + servername + "</host><port>" + a.port + "</port><name>anon</name></stats>";
 		}
@@ -298,17 +312,18 @@ public class Collector {
 		public void run() {
 			try {
 				logger.debug("sending summary stream");
-
 				long tod = System.currentTimeMillis() / 1000L - 60;
 				String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
-				String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" + totBytesWriten.toString() + "</in><out>"
-						+ totBytesRead.toString() + "</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
+				String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" 
+						+ totBytesWriten.toString() +
+						"</in><out>"
+						+totBytesRead.toString() +
+//						+"100000000000"+
+						"</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
 				String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
 						+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
 				logger.debug(xmlmessage);
 				
-				DatagramChannel c = (DatagramChannel) cbsSummary.bind();
-
 				
 				ChannelFuture f = c.write(xmlmessage, destination);
 				f.addListener(new ChannelFutureListener(){
@@ -318,7 +333,6 @@ public class Collector {
 		                 else {
 		                	 logger.error("summary stream IO completed. did not send info:"+future.getCause());
 		                 }
-		                 future.getChannel().close(); 
 		             }
 				} 
 				);
@@ -337,10 +351,11 @@ public class Collector {
 	
 	private class SendDetailedStatisticsTask extends TimerTask {
 		private InetSocketAddress destination;
+		private DatagramChannel c; 
 
-		// private String info;
 		SendDetailedStatisticsTask(Address a) {
 			destination = new InetSocketAddress(a.address, a.port);
+			c = (DatagramChannel) cbsDetailed.bind();
 		}
 
 		public void run() {
@@ -351,7 +366,6 @@ public class Collector {
 			logger.debug("sending detailed stream");
 			try {
 				fseq += 1;
-				DatagramChannel c = (DatagramChannel) cbsDetailed.bind();
 
 				logger.debug("fmap size: " + fmap.size());
 				short plen = (short) (24); // this is length of 2 mandatory
@@ -509,7 +523,7 @@ public class Collector {
 		                 else {
 		                	 logger.error("detailed stream IO completed. did not send info:"+future.getCause());
 		                 }
-		                 future.getChannel().close(); 
+//		                 future.getChannel().close(); 
 		             }
 				} 
 				);

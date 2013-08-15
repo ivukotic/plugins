@@ -65,7 +65,7 @@ public class CollectorAddresses {
 				res += a.toString();
 			}
 		} else
-			res += "Summary information will not be sent.";
+			res += "Summary information will not be sent.\n";
 
 		if (detailed.size() > 0) {
 			res += "Detailed information will be sent to: \n";
@@ -73,7 +73,7 @@ public class CollectorAddresses {
 				res += a.toString();
 			}
 		} else
-			res += "Detailed information will not be sent.";
+			res += "Detailed information will not be sent.\n";
 
 		return res;
 	}
