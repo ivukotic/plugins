@@ -42,8 +42,9 @@ import org.slf4j.LoggerFactory;
 public class Collector {
 
 	final static Logger logger = LoggerFactory.getLogger(Collector.class);
-	
+
 	private String servername;
+	private String sitename;
 	private Properties properties;
 
 	private int tos; // time of server start
@@ -57,23 +58,24 @@ public class Collector {
 	private int closedetails = 0;
 
 	private int pid;
-	private byte fseq = 0;
+	private byte fseq = 0; // sequence for f-stream
+	private byte pseq = 0; // sequence for all other streams.
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap cbsSummary;
 	private ConnectionlessBootstrap cbsDetailed;
 	private ConnectionlessBootstrap cbsMMSender;
 	private DatagramChannel dcMM;
-	
+
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
 	private AtomicInteger currentConnections = new AtomicInteger();
 	private AtomicInteger successfulConnections = new AtomicInteger();
+	private AtomicInteger maxConnections = new AtomicInteger();
 	public AtomicLong totBytesRead = new AtomicLong();
 	public AtomicLong totBytesWriten = new AtomicLong();
 	private CollectorAddresses ca = new CollectorAddresses();
-
 
 	Collector(Properties properties) {
 		this.properties = properties;
@@ -82,12 +84,8 @@ public class Collector {
 
 	private void init() {
 
-		String pServerName = properties.getProperty("servername"); // if not
-																	// defined
-																	// will try
-																	// to get it
-																	// using
-																	// getHostName.
+		// if not defined will try to get it using getHostName.
+		String pServerName = properties.getProperty("servername");
 		if (pServerName != null) {
 			servername = pServerName;
 		} else {
@@ -100,6 +98,12 @@ public class Collector {
 				e.printStackTrace();
 			}
 		}
+
+		String pSitename = properties.getProperty("site");
+		if (pSitename != null)
+			sitename = pSitename;
+		else
+			sitename = "anon";
 
 		ca.init(properties);
 		logger.info(ca.toString());
@@ -114,13 +118,8 @@ public class Collector {
 			pid = 123456;
 		}
 
-		
-		
-		
-		
 		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
-		
-		
+
 		// this one is for sending summary data
 		cbsSummary = new ConnectionlessBootstrap(f);
 		cbsSummary.setOption("localAddress", new InetSocketAddress(0));
@@ -129,11 +128,11 @@ public class Collector {
 
 		cbsSummary.setPipelineFactory(new ChannelPipelineFactory() {
 			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1), 
-						        new SimpleChannelUpstreamHandler());
+				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
 			}
 		});
-		
+
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
@@ -141,33 +140,28 @@ public class Collector {
 			logger.info("Setting summary monitoring local port (outbound) to: " + a.outboundport);
 		}
 
-
-
 		// this one are detailed
 
 		cbsDetailed = new ConnectionlessBootstrap(f);
 		cbsDetailed.setOption("localAddress", new InetSocketAddress(0));
 		cbsDetailed.setOption("broadcast", "true");
 		cbsDetailed.setOption("connectTimeoutMillis", 10000);
-		
+
 		cbsDetailed.setPipelineFactory(new ChannelPipelineFactory() {
 			public ChannelPipeline getPipeline() throws Exception {
 				return Channels.pipeline(
-//						new StringEncoder(CharsetUtil.ISO_8859_1), 
-//						new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler()
-						);
+				// new StringEncoder(CharsetUtil.ISO_8859_1),
+				// new StringDecoder(CharsetUtil.ISO_8859_1),
+						new SimpleChannelUpstreamHandler());
 			}
 		});
-		
+
 		for (Address a : ca.detailed) {
 			Timer timer = new Timer();
 			timer.schedule(new SendDetailedStatisticsTask(a), 0, a.delay * 1000);
 			cbsDetailed.setOption("localAddress", new InetSocketAddress(a.outboundport));
 			logger.info("Setting detailed monitoring local port (outbound) to: " + a.outboundport);
 		}
-
-
 
 		// this one is for mapping messages
 
@@ -182,12 +176,10 @@ public class Collector {
 						new SimpleChannelUpstreamHandler());
 			}
 		});
- 
+
 		dcMM = (DatagramChannel) cbsMMSender.bind();
 	}
 
-
-	
 	public void addConnectionAttempt() {
 		connectionAttempts.getAndIncrement();
 	}
@@ -212,7 +204,8 @@ public class Collector {
 	}
 
 	public void connectedEvent(int connectionId, SocketAddress remoteAddress) {
-		currentConnections.getAndIncrement();
+		if (currentConnections.getAndIncrement() > maxConnections.get())
+			maxConnections.set(currentConnections.get());
 		logger.debug(">>>Connected " + connectionId + " " + remoteAddress);
 	}
 
@@ -243,13 +236,11 @@ public class Collector {
 		}
 	}
 
-
-	
 	private class MapMessagesSender extends Thread {
 		private InetSocketAddress destination;
 		private Integer dictid;
 		private String content;
-		
+
 		MapMessagesSender(Address a, Integer dictid, String content) {
 			destination = new InetSocketAddress(a.address, a.port);
 			this.dictid = dictid;
@@ -259,8 +250,8 @@ public class Collector {
 		public void run() {
 			logger.debug("Sending Map Message.");
 			try {
-				fseq += 1;
-				
+				pseq += 1;
+
 				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=whatever";
 				content += authinfo;
 				short plen = (short) (12 + content.length());
@@ -268,23 +259,22 @@ public class Collector {
 
 				// main header
 				db.writeByte((byte) 117); // 'u'
-				db.writeByte((byte) fseq);
+				db.writeByte((byte) pseq);
 				db.writeShort(plen);
 				db.writeInt(tos);
 				db.writeInt(dictid); // this is dictID
 				db.writeBytes(content.getBytes());
 				ChannelFuture f = dcMM.write(db, destination);
 
-				f.addListener(new ChannelFutureListener(){
-		             public void operationComplete(ChannelFuture future) {
-		                 if (future.isSuccess()) 
-		                	 logger.debug("Map Message IO completed. success!");
-		                 else {
-		                	 logger.error("Map Message IO completed. did not send info:"+future.getCause());
-		                 }
-		             }
-				} 
-				);
+				f.addListener(new ChannelFutureListener() {
+					public void operationComplete(ChannelFuture future) {
+						if (future.isSuccess())
+							logger.debug("Map Message IO completed. success!");
+						else {
+							logger.error("Map Message IO completed. did not send info:" + future.getCause());
+						}
+					}
+				});
 
 			} catch (Exception e) {
 				logger.error("unrecognized exception: " + e.getMessage());
@@ -293,65 +283,80 @@ public class Collector {
 
 	}
 
-	
-	
-	
-	
-	
 	private class SendSummaryStatisticsTask extends TimerTask {
 		private InetSocketAddress destination;
 		private String info;
+		private String STATISTICSstart, STATISTICSend;
+		private String SGENstart, SGENend;
+		private String LINKstart, LINKend;
 		private DatagramChannel c;
-		
+		private long lastUpdate;
+
 		SendSummaryStatisticsTask(Address a) {
 			c = (DatagramChannel) cbsSummary.bind();
 			destination = new InetSocketAddress(a.address, a.port);
-			info = "<stats id=\"info\"><host>" + servername + "</host><port>" + a.port + "</port><name>anon</name></stats>";
+			STATISTICSstart = "<statistics ver=\"v1.9.12.21\" pgm=\"xrootd\" ins=\"anon\"";
+			STATISTICSstart += " tos=\"" + tos + "\"";
+			STATISTICSstart += " src=\"" + servername + ":" + c.getLocalAddress().getPort() + "\"";
+			STATISTICSstart += " host=\"" + servername + "\"";
+			STATISTICSstart += " site=\"" + sitename + "\"";
+			STATISTICSstart += " pid=\"" + pid + "\"";
+			STATISTICSend = "</statistics>";
+
+			// needs instance name and proper port - how to get it from dCache?
+			info = "<stats id=\"info\"><host>" + servername + "</host><port>1096</port><name>anon</name></stats>";
+
+			SGENstart = "<stats id=\"sgen\"><as>1</as><et>" + a.delay + "</et>";
+			SGENend = "</stats>";
+
+			// these are not implemented yet: cumulative connection seconds, timeouts, partial received files, partialSendFiles
+			LINKstart = "<stats id=\"link\">";
+			LINKend = "<ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
+
+			lastUpdate = System.currentTimeMillis() / 1000L;
 		}
 
 		public void run() {
 			try {
 				logger.debug("sending summary stream");
-				long tod = System.currentTimeMillis() / 1000L - 60;
-				String sgen = "<stats id=\"sgen\"><as>1</as><et>60000</et><toe>" + (tod + 60) + "</toe></stats>";
-				String link = "<stats id=\"link\"><num>1</num><maxn>1</maxn><tot>20</tot><in>" 
-						+ totBytesWriten.toString() +
-						"</in><out>"
-						+totBytesRead.toString() +
-//						+"100000000000"+
-						"</out><ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
-				String xmlmessage = "<statistics tod=\"" + tod + "\" ver=\"v1.9.12.21\" tos=\"" + tos + "\" src=\"" + servername
-						+ "\" pgm=\"xrootd\" ins=\"anon\" pid=\"" + pid + "\">" + info + sgen + link + "</statistics>";
+				
+				long curTime = System.currentTimeMillis() / 1000L;
+				String sgen = SGENstart + "<toe>" + curTime + "</toe>" + SGENend;
+
+				String link = LINKstart;
+				link += "<num>" + currentConnections.toString() + "</num>";
+				link += "<maxn>" + maxConnections.toString() + "</maxn>";
+				link += "<tot>" + connectionAttempts.toString() + "</tot>";
+				link += "<in>" + totBytesWriten.toString() + "</in>";
+				link += "<out>" + totBytesRead.toString()+ "</out>";
+				link += LINKend;
+
+				String xmlmessage = STATISTICSstart +" tod=\"" + lastUpdate+"\">" + sgen + info + link + STATISTICSend;
+				
 				logger.debug(xmlmessage);
-				
-				
+
+				lastUpdate = curTime;
+
 				ChannelFuture f = c.write(xmlmessage, destination);
-				f.addListener(new ChannelFutureListener(){
-		             public void operationComplete(ChannelFuture future) {
-		                 if (future.isSuccess()) 
-		                	 logger.debug("summary stream IO completed. success!");
-		                 else {
-		                	 logger.error("summary stream IO completed. did not send info:"+future.getCause());
-		                 }
-		             }
-				} 
-				);
-				
-				
+				f.addListener(new ChannelFutureListener() {
+					public void operationComplete(ChannelFuture future) {
+						if (future.isSuccess())
+							logger.debug("summary stream IO completed. success!");
+						else {
+							logger.error("summary stream IO completed. did not send info:" + future.getCause());
+						}
+					}
+				});
+
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending summary stream: " + e.getMessage());
 			}
 		}
 	}
 
-	
-	
-	
-	
-	
 	private class SendDetailedStatisticsTask extends TimerTask {
 		private InetSocketAddress destination;
-		private DatagramChannel c; 
+		private DatagramChannel c;
 
 		SendDetailedStatisticsTask(Address a) {
 			destination = new InetSocketAddress(a.address, a.port);
@@ -516,17 +521,16 @@ public class Collector {
 				db.setShort(14, subpackets);
 
 				ChannelFuture f = c.write(db, destination);
-				f.addListener(new ChannelFutureListener(){
-		             public void operationComplete(ChannelFuture future) {
-		                 if (future.isSuccess()) 
-		                	 logger.debug("detailed stream IO completed. success!");
-		                 else {
-		                	 logger.error("detailed stream IO completed. did not send info:"+future.getCause());
-		                 }
-//		                 future.getChannel().close(); 
-		             }
-				} 
-				);
+				f.addListener(new ChannelFutureListener() {
+					public void operationComplete(ChannelFuture future) {
+						if (future.isSuccess())
+							logger.debug("detailed stream IO completed. success!");
+						else {
+							logger.error("detailed stream IO completed. did not send info:" + future.getCause());
+						}
+						// future.getChannel().close();
+					}
+				});
 
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending f-stream: " + e.getMessage());

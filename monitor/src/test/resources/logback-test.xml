@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+
+<configuration>
+  
+  <appender name="stdout" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%5p [%t] (%F:%L) - %m%n</pattern>
+    </encoder>
+  </appender>
+  
+  <appender name="file" class="ch.qos.logback.core.rolling.RollingFileAppender">
+    <File>/tmp/xrootd_dcache_monitor.log</File>
+
+    <encoder>
+      <pattern>%d %5p %c{1}:%L - %m%n</pattern>
+    </encoder>
+
+    <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+      <maxIndex>1</maxIndex>
+      <FileNamePattern>/tmp/xrootd_dcache_monitor.log.%i</FileNamePattern>
+    </rollingPolicy>
+
+    <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+      <MaxFileSize>1MB</MaxFileSize>
+    </triggeringPolicy>
+
+  </appender>
+  
+  <logger name="edu.uchicago.monitor.Collector" level="DEBUG"/> 
+  <logger name="edu.uchicago.monitor.MonitorChannelHandler" level="DEBUG"/> 
+  <logger name="edu.uchicago.monitor.MonitorChannelHandlerFactoryTest" level="DEBUG"/>
+  
+  <root level="WARNING">
+    <appender-ref ref="stdout"/>
+    <appender-ref ref="file"/>
+  </root>
+  
+</configuration>
