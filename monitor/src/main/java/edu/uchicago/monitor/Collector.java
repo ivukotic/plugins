@@ -22,19 +22,15 @@ import static org.jboss.netty.buffer.ChannelBuffers.*;
 
 import org.jboss.netty.channel.ChannelFuture;
 import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
 import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.MessageEvent;
-import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.channel.socket.DatagramChannel;
 import org.jboss.netty.channel.socket.DatagramChannelFactory;
 import org.jboss.netty.channel.socket.nio.NioDatagramChannelFactory;
 import org.jboss.netty.handler.codec.string.StringDecoder;
 import org.jboss.netty.handler.codec.string.StringEncoder;
-import org.jboss.netty.handler.logging.LoggingHandler;
 import org.jboss.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -68,6 +64,8 @@ public class Collector {
 	private DatagramChannel dcMM;
 
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
+	public final Map<Integer, UserInfo> umap = new ConcurrentHashMap<Integer, UserInfo>();
+	public final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
 	private AtomicInteger currentConnections = new AtomicInteger();
@@ -184,13 +182,14 @@ public class Collector {
 		connectionAttempts.getAndIncrement();
 	}
 
-	public void openEvent(int connectionId, FileStatistics fs) {
+	public void openFileEvent(int connectionId, FileStatistics fs) {
 		// Note that status may be null - only available if client requested it
 		logger.debug(">>>Opened " + connectionId + "\n" + fs.toString());
 		fs.state |= 0x0011; // set first and second bit
+		SendMapMessage((byte) 100, connectionId, fs.filename);
 	}
 
-	public void closeEvent(int connectionId, int fh) {
+	public void closeFileEvent(int connectionId, int fh) {
 		logger.debug(">>>Closed " + connectionId + "  file handle: " + fh);
 		if (fmap.get(fh) == null) {
 			logger.warn("File handle missing from the fmap. Should not happen except in case of recent restart. ");
@@ -203,17 +202,41 @@ public class Collector {
 			fmap.get(fh).state |= 0x0004; // set third bit
 	}
 
-	public void connectedEvent(int connectionId, SocketAddress remoteAddress) {
+	public void connectedEvent(int connectionId) {
 		if (currentConnections.getAndIncrement() > maxConnections.get())
 			maxConnections.set(currentConnections.get());
-		logger.debug(">>>Connected " + connectionId + " " + remoteAddress);
+		cmap.put(connectionId, new ConnectionInfo(connectionId));
 	}
 
-	public void disconnectedEvent(int connectionId, long duration) {
+	public void disconnectedEvent(int connectionId) {
 		currentConnections.getAndDecrement();
 		successfulConnections.getAndIncrement();
-		logger.debug(">>>Disconnected " + connectionId + " " + duration + "ms");
+		try {
+			logger.info("DISCONNECTED "+connectionId);
+			cmap.get(connectionId).ConnectionClose();
+			cmap.remove(connectionId);
+		} catch (Exception ex) {
+			logger.warn("connection closed before user loged in.");
+			logger.error(ex.getMessage());
+		}
+
 	}
+	
+	public void loggedEvent(int connectionId, SocketAddress remoteAddress) {
+
+		UserInfo ui = umap.get(connectionId);
+		if (ui != null) {
+			ui.host = ((InetSocketAddress) remoteAddress).getHostName();
+			ui.port = ((InetSocketAddress) remoteAddress).getPort();
+			logger.info("LOGGED " + connectionId + " " + ui.getInfo());
+			SendMapMessage((byte) 117, connectionId, ui.getInfo());
+			cmap.put(connectionId, new ConnectionInfo(connectionId));
+		} else {
+			logger.error("Could not map connection " + connectionId + "to user.");
+		}
+	}
+
+
 
 	@Override
 	public String toString() {
@@ -228,10 +251,11 @@ public class Collector {
 		return res;
 	}
 
-	public void SendMapMessage(Integer dictid, String content) {
-		logger.debug("sending map message: " + content);
+	// type - 117:u 100:d 105:i
+	public void SendMapMessage(byte mtype, Integer dictid, String content) {
+		logger.info("sending map message: " + dictid.toString() + " -> " + content);
 		for (Address a : ca.detailed) {
-			MapMessagesSender mms = new MapMessagesSender(a, dictid, content);
+			MapMessagesSender mms = new MapMessagesSender(a, mtype, dictid, content);
 			mms.start();
 		}
 	}
@@ -240,11 +264,13 @@ public class Collector {
 		private InetSocketAddress destination;
 		private Integer dictid;
 		private String content;
+		private byte mtype;
 
-		MapMessagesSender(Address a, Integer dictid, String content) {
+		MapMessagesSender(Address a, byte mtype, Integer dictid, String content) {
 			destination = new InetSocketAddress(a.address, a.port);
 			this.dictid = dictid;
 			this.content = content;
+			this.mtype = mtype;
 		}
 
 		public void run() {
@@ -252,13 +278,11 @@ public class Collector {
 			try {
 				pseq += 1;
 
-				String authinfo = "\n&p=SSL&n=ivukotic&h=hostname&o=UofC&r=Production&g=higgs&m=whatever";
-				content += authinfo;
 				short plen = (short) (12 + content.length());
 				ChannelBuffer db = dynamicBuffer(plen);
 
 				// main header
-				db.writeByte((byte) 117); // 'u'
+				db.writeByte(mtype);
 				db.writeByte((byte) pseq);
 				db.writeShort(plen);
 				db.writeInt(tos);
@@ -269,7 +293,7 @@ public class Collector {
 				f.addListener(new ChannelFutureListener() {
 					public void operationComplete(ChannelFuture future) {
 						if (future.isSuccess())
-							logger.debug("Map Message IO completed. success!");
+							logger.debug("Map Message sent! Type: " + mtype);
 						else {
 							logger.error("Map Message IO completed. did not send info:" + future.getCause());
 						}
@@ -309,7 +333,8 @@ public class Collector {
 			SGENstart = "<stats id=\"sgen\"><as>1</as><et>" + a.delay + "</et>";
 			SGENend = "</stats>";
 
-			// these are not implemented yet: cumulative connection seconds, timeouts, partial received files, partialSendFiles
+			// these are not implemented yet: cumulative connection seconds,
+			// timeouts, partial received files, partialSendFiles
 			LINKstart = "<stats id=\"link\">";
 			LINKend = "<ctime>0</ctime><tmo>0</tmo><stall>0</stall><sfps>0</sfps></stats>";
 
@@ -319,7 +344,7 @@ public class Collector {
 		public void run() {
 			try {
 				logger.debug("sending summary stream");
-				
+
 				long curTime = System.currentTimeMillis() / 1000L;
 				String sgen = SGENstart + "<toe>" + curTime + "</toe>" + SGENend;
 
@@ -328,11 +353,11 @@ public class Collector {
 				link += "<maxn>" + maxConnections.toString() + "</maxn>";
 				link += "<tot>" + connectionAttempts.toString() + "</tot>";
 				link += "<in>" + totBytesWriten.toString() + "</in>";
-				link += "<out>" + totBytesRead.toString()+ "</out>";
+				link += "<out>" + totBytesRead.toString() + "</out>";
 				link += LINKend;
 
-				String xmlmessage = STATISTICSstart +" tod=\"" + lastUpdate+"\">" + sgen + info + link + STATISTICSend;
-				
+				String xmlmessage = STATISTICSstart + " tod=\"" + lastUpdate + "\">" + sgen + info + link + STATISTICSend;
+
 				logger.debug(xmlmessage);
 
 				lastUpdate = curTime;
