@@ -1,5 +1,6 @@
 package edu.uchicago.monitor;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 class FileStatistics
@@ -12,9 +13,9 @@ class FileStatistics
     public final AtomicLong bytesWritten = new AtomicLong();
     public final AtomicLong bytesVectorRead = new AtomicLong();
     public final AtomicLong bytesRead = new AtomicLong();
-    public final AtomicLong reads = new AtomicLong();
-    public final AtomicLong vectorReads = new AtomicLong();
-    public final AtomicLong writes = new AtomicLong();
+    public final AtomicInteger reads = new AtomicInteger();
+    public final AtomicInteger vectorReads = new AtomicInteger();
+    public final AtomicInteger writes = new AtomicInteger();
     public int state=0; //bit 1- report on opening, bit 2 - report transfer, 3-report file as closed and close it. 
     
     FileStatistics(int dictid){

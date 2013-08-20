@@ -176,6 +176,10 @@ public class Collector {
 		});
 
 		dcMM = (DatagramChannel) cbsMMSender.bind();
+
+		Timer timer = new Timer();
+		timer.schedule(new currentStatus(), 0, 5 * 60 * 1000);
+
 	}
 
 	public void addConnectionAttempt() {
@@ -212,16 +216,20 @@ public class Collector {
 		currentConnections.getAndDecrement();
 		successfulConnections.getAndIncrement();
 		try {
-			logger.info("DISCONNECTED "+connectionId);
+			logger.info("DISCONNECTED " + connectionId);
 			cmap.get(connectionId).ConnectionClose();
 			cmap.remove(connectionId);
+			if (ca.reportDetailed == false)
+				umap.remove(connectionId);
+			else
+				umap.get(connectionId).disconnected = true;
 		} catch (Exception ex) {
 			logger.warn("connection closed before user loged in.");
 			logger.error(ex.getMessage());
 		}
 
 	}
-	
+
 	public void loggedEvent(int connectionId, SocketAddress remoteAddress) {
 
 		UserInfo ui = umap.get(connectionId);
@@ -235,8 +243,6 @@ public class Collector {
 			logger.error("Could not map connection " + connectionId + "to user.");
 		}
 	}
-
-
 
 	@Override
 	public String toString() {
@@ -402,28 +408,31 @@ public class Collector {
 											// headers
 				ChannelBuffer db = dynamicBuffer(plen);
 
-				// main header
+				// main header - XrdXrootdMonHeader - 8 bytes
 				db.writeByte((byte) 102); // 'f'
 				db.writeByte((byte) fseq);
 				db.writeShort(plen); // will be replaced later
-				db.writeInt(tos);
+				db.writeInt(tos); // time of server start
 
-				// first timing header
+				// first timing header - XrdXrootdMonFileTOD - 16 bytes
 				db.writeByte((byte) 2); // 2 - means isTime
 				db.writeByte((byte) 0); // no meaning here
 				db.writeShort(16); // size of this header
-				db.writeShort(0); // since this is TOD - this is nRec[0]
-				db.writeShort(0); // this gives total number of "subpackages".
-									// will
-									// be overwritten bellow
-				db.writeInt(tosc); // unix time - this should be start of
-									// package
-									// collection time
+				// first short nRec[0] should give number of isXfr records
+				// second short nRec[1] should give total number of records
+				// will be overwritten below.
+				db.writeShort(0);
+				db.writeShort(0);
+				// unix time - this should be start of package collection time
+				db.writeInt(tosc);
 				toec = (int) (System.currentTimeMillis() / 1000L);
-				db.writeInt(toec); // unix time - this should be time of
-									// sending.
+				// unix time - this should be time of sending.
+				db.writeInt(toec);
+
 				tosc = toec;
 				int subpackets = 0;
+				int xfrpackets = 0;
+
 				Iterator<Entry<Integer, FileStatistics>> it = fmap.entrySet().iterator();
 				while (it.hasNext()) {
 					Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
@@ -465,7 +474,7 @@ public class Collector {
 						subpackets += 1;
 					}
 
-					db.writeByte((byte) 3); // fileIO report
+					db.writeByte((byte) 3); // 3 means isXfr
 					db.writeByte((byte) 0); // no meaning
 					db.writeShort(32); // 3*longlong + this header itself
 					db.writeInt(fs.fileId); // replace with dictid of the file
@@ -473,6 +482,7 @@ public class Collector {
 					db.writeLong(fs.bytesVectorRead.get());
 					db.writeLong(fs.bytesWritten.get());
 					plen += 32;
+					xfrpackets += 1;
 					subpackets += 1;
 
 					if ((fs.state & 0x0004) > 0) { // add fileclose structure
@@ -508,9 +518,9 @@ public class Collector {
 						}
 
 						if (closedetails > 1) { // OPS
-							db.writeInt(111); // reads
-							db.writeInt(112); // readVs
-							db.writeInt(113); // writes
+							db.writeInt(fs.reads.get()); // reads
+							db.writeInt(fs.vectorReads.get()); // readVs
+							db.writeInt(fs.writes.get()); // writes
 							db.writeShort(11); // shortest readv segments
 							db.writeShort(12); // longest readv segments
 							db.writeLong(123456); // number of readv segments
@@ -541,8 +551,24 @@ public class Collector {
 
 				}
 
+				// disconnect users
+				Iterator<Entry<Integer, UserInfo>> iter = umap.entrySet().iterator();
+				while (iter.hasNext()) {
+					Map.Entry<Integer, UserInfo> ent = (Map.Entry<Integer, UserInfo>) iter.next();
+					if (ent.getValue().disconnected == true) {
+						db.writeByte((byte) 4); // 4 - means isDisc
+						db.writeByte((byte) 0); // no meaning
+						db.writeShort(8); // size
+						db.writeInt(ent.getKey()); // userID
+						subpackets += 1;
+						plen += 8;
+						iter.remove();
+					}
+				}
+
 				logger.debug("message length: " + plen + "\t buffer length:" + db.writableBytes());
 				db.setShort(2, plen);
+				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
 
 				ChannelFuture f = c.write(db, destination);
@@ -562,6 +588,34 @@ public class Collector {
 			}
 		}
 
+	}
+
+	private class currentStatus extends TimerTask {
+		public void run() {
+			String res = new String();
+			res += "Report ----------------------------------------------------\n";
+			res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
+			res += "Current Connections:     " + currentConnections.toString() + "\n";
+			res += "Connections established: " + successfulConnections.toString() + "\n";
+			res += "Bytes Read:              " + totBytesRead.toString() + "\n";
+			res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
+			res += "-----------------------------------------------------------\n";
+			res += "Current connections:\n";
+			for (Map.Entry<Integer, ConnectionInfo> entry : cmap.entrySet()) {
+				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
+			}
+			res += "Current users:\n";
+			for (Map.Entry<Integer, UserInfo> entry : umap.entrySet()) {
+				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
+			}
+			logger.info(res);
+			res = "";
+			res += "Current openfiles:\n";
+			for (Map.Entry<Integer, FileStatistics> entry : fmap.entrySet()) {
+				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
+			}
+			logger.info(res);
+		}
 	}
 
 }

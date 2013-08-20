@@ -30,7 +30,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
 	private int connId;
-	private static int fileCounter = 100;
+	private static int fileCounter = 1;
 
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
@@ -55,7 +55,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					fs.reads.getAndIncrement();
 					collector.totBytesRead.getAndAdd(rr.bytesToRead());
 				} else {
-					logger.warn("can't get connectionId from fmap. should not happen except in case of recent restart.");
+					logger.warn("can't get connId "+connId+" in fmap. should not happen except in case of recent restart.");
 				}
 			}
 
@@ -121,7 +121,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				logger.warn("FILE OPEN REQUEST    connId: " + connId + "   readonly: " + mode + "   path :" + fs.filename);
 				fs.mode = mode;
 				collector.fmap.put(-connId, fs);
-				// logger.info("------------------------------------");
 			}
 
 			else if (message instanceof CloseRequest) {
@@ -129,7 +128,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				logger.info("FILE CLOSE REQUEST ------- connId:     " + connId);
 				// collector.closeEvent(connId, cr.getFileHandle());
 				collector.closeFileEvent(connId, connId);
-				// logger.info("------------------------------------");
 			}
 
 			else if (message instanceof WriteRequest) {
@@ -266,14 +264,9 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				AbstractResponseMessage ARM = (AbstractResponseMessage) message;
 				XrootdRequest req = ARM.getRequest();
 				if (req instanceof LoginRequest) {
-					logger.info("LOGGIN RESPONSE connId:     " + connId + "    host ip:    " + e.getChannel().getRemoteAddress());
+					logger.debug("LOGGIN RESPONSE connId:     " + connId + "    host ip:    " + e.getChannel().getRemoteAddress());
 					collector.loggedEvent(connId, e.getChannel().getRemoteAddress());
 				}
-				// logger.info("I-> streamID: "+req.getStreamId()+
-				// "\treqID: "+req.getRequestId());
-				// logger.info("IB->: "+ (ARM.getBuffer()).toString("UTF-8") ) ;
-				// logger.warn("Unhandled AbstractResponseMessage DOWN: "+
-				// me.toString());
 			} else {
 				logger.warn("Unhandled MessageEvent DOWN: " + me.toString());
 			}
