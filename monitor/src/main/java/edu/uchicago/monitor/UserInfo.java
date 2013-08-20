@@ -5,14 +5,17 @@ public class UserInfo {
 	public int pid;
 	public String host;
 	public int port;
-	public Boolean disconnected; // initially this is 0. on disconnect will be changed to 1 and upon sending f-stream info will get removed.
-
+	
 	UserInfo(String name, int pid) {
 		this.name = name;
 		this.pid = pid;
-		this.disconnected = false; 
 	}
-
+	
+	public void setHostPort(String host, int port){
+		this.host=host;
+		this.port=port;
+	}
+	
 	public String getInfo() {
 		return name + "." + pid + ":" + (pid << 16 | port) + "@" + host + "\n&p=X509&n=" + name + "&h=" + host + "&o=&r=&g=&m=";
 	}

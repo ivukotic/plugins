@@ -55,7 +55,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					fs.reads.getAndIncrement();
 					collector.totBytesRead.getAndAdd(rr.bytesToRead());
 				} else {
-					logger.warn("can't get connId "+connId+" in fmap. should not happen except in case of recent restart.");
+					logger.warn("can't get connId " + connId + " in fmap. should not happen except in case of recent restart.");
 				}
 			}
 
@@ -64,6 +64,11 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// 0
 				// when fileHandle is not 0? Can someone ask for vector read
 				// from 2 files simultaneously?
+
+				FileStatistics fs = collector.fmap.get(connId);
+				fs.vectorReads.getAndIncrement();
+				
+				// not sure if this bellow works.
 				ReadVRequest rr = (ReadVRequest) message;
 				EmbeddedReadRequest[] err = rr.getReadRequestList();
 				Map<Integer, Integer> fts = new HashMap<Integer, Integer>();
@@ -79,10 +84,10 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				int totVread = 0;
 				for (Map.Entry<Integer, Integer> entry : fts.entrySet()) {
 					// FileStatistics fs = collector.fmap.get(entry.getKey());
-					FileStatistics fs = collector.fmap.get(connId);
-					if (fs != null) {
-						fs.bytesRead.getAndAdd(entry.getValue());
-						fs.reads.getAndIncrement();
+					FileStatistics fs1 = collector.fmap.get(connId);
+					if (fs1 != null) {
+						fs1.bytesRead.getAndAdd(entry.getValue());
+						fs1.reads.getAndIncrement();
 						totVread += entry.getValue();
 					}
 				}
@@ -95,7 +100,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				String user = lr.getUserName();
 				int userpid = lr.getPID();
 				logger.info("LOGIN REQUEST   " + connId + "    client username: " + user + "   protocol: " + protocol + "     client PID: " + userpid);
-				collector.umap.put(connId, new UserInfo(user, userpid));
+				collector.cmap.get(connId).logUserRequest(user,userpid);
 			}
 
 			// from OpenRequest we get:
@@ -228,14 +233,13 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			if (me.getChannel().getId() != connId) {
 				logger.error("response before request! very strange");
 			}
-			
-			
+
 			// if (message instanceof ReadResponse){
-			// 		// this happens a lot 
+			// // this happens a lot
 			// }
 			// if (message instanceof LoginResponse) {
-			//      // LoginResponse lr = (LoginResponse) message;
-			//      // for whatever reason this does not happen
+			// // LoginResponse lr = (LoginResponse) message;
+			// // for whatever reason this does not happen
 			// }
 
 			if (message instanceof OpenResponse) {
@@ -254,9 +258,15 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				}
 				fs.filesize = OR.getFileStatus().getSize();
 				// collector.fmap.put(OR.getFileHandle(), fs);
-				collector.fmap.put(connId, fs);
+
+				if (collector.cmap.get(connId).filesOpen > 0) {
+					logger.warn("Connection: " + connId + " already had a file opened. Can't add new one.");
+					collector.cmap.get(connId).filesOpen = +1;
+				} else {
+					collector.fmap.put(connId, fs);
+					collector.openFileEvent(connId, fs);
+				}
 				collector.fmap.remove(-connId);
-				collector.openFileEvent(connId, fs);
 				// logger.info("-----------------------------------------------");
 			}
 

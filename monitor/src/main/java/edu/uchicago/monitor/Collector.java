@@ -64,7 +64,6 @@ public class Collector {
 	private DatagramChannel dcMM;
 
 	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
-	public final Map<Integer, UserInfo> umap = new ConcurrentHashMap<Integer, UserInfo>();
 	public final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
@@ -218,13 +217,10 @@ public class Collector {
 		try {
 			logger.info("DISCONNECTED " + connectionId);
 			cmap.get(connectionId).ConnectionClose();
-			cmap.remove(connectionId);
-			if (ca.reportDetailed == false)
-				umap.remove(connectionId);
-			else
-				umap.get(connectionId).disconnected = true;
+			if (ca.reportDetailed == false) 
+				cmap.remove(connectionId);
 		} catch (Exception ex) {
-			logger.warn("connection closed before user loged in.");
+			logger.warn("connection closed before being opened.");
 			logger.error(ex.getMessage());
 		}
 
@@ -232,13 +228,10 @@ public class Collector {
 
 	public void loggedEvent(int connectionId, SocketAddress remoteAddress) {
 
-		UserInfo ui = umap.get(connectionId);
-		if (ui != null) {
-			ui.host = ((InetSocketAddress) remoteAddress).getHostName();
-			ui.port = ((InetSocketAddress) remoteAddress).getPort();
-			logger.info("LOGGED " + connectionId + " " + ui.getInfo());
-			SendMapMessage((byte) 117, connectionId, ui.getInfo());
-			cmap.put(connectionId, new ConnectionInfo(connectionId));
+		ConnectionInfo ci = cmap.get(connectionId);
+		if (ci != null) {
+			ci.logUserResponse(((InetSocketAddress) remoteAddress).getHostName(), ((InetSocketAddress) remoteAddress).getPort());
+			SendMapMessage((byte) 117, connectionId, ci.ui.getInfo());
 		} else {
 			logger.error("Could not map connection " + connectionId + "to user.");
 		}
@@ -250,7 +243,7 @@ public class Collector {
 		res += "SUMMARY ----------------------------------\n";
 		res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
 		res += "Current Connections:     " + currentConnections.toString() + "\n";
-		res += "Connections established: " + successfulConnections.toString() + "\n";
+		res += "Successful Connections:  " + successfulConnections.toString() + "\n";
 		res += "Bytes Read:              " + totBytesRead.toString() + "\n";
 		res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
 		res += "SUMMARY ----------------------------------\n";
@@ -551,10 +544,10 @@ public class Collector {
 
 				}
 
-				// disconnect users
-				Iterator<Entry<Integer, UserInfo>> iter = umap.entrySet().iterator();
+				// disconnects
+				Iterator<Entry<Integer, ConnectionInfo>> iter = cmap.entrySet().iterator();
 				while (iter.hasNext()) {
-					Map.Entry<Integer, UserInfo> ent = (Map.Entry<Integer, UserInfo>) iter.next();
+					Map.Entry<Integer, ConnectionInfo> ent = (Map.Entry<Integer, ConnectionInfo>) iter.next();
 					if (ent.getValue().disconnected == true) {
 						db.writeByte((byte) 4); // 4 - means isDisc
 						db.writeByte((byte) 0); // no meaning
@@ -602,10 +595,6 @@ public class Collector {
 			res += "-----------------------------------------------------------\n";
 			res += "Current connections:\n";
 			for (Map.Entry<Integer, ConnectionInfo> entry : cmap.entrySet()) {
-				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
-			}
-			res += "Current users:\n";
-			for (Map.Entry<Integer, UserInfo> entry : umap.entrySet()) {
 				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
 			}
 			logger.info(res);

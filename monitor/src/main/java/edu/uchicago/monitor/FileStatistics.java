@@ -25,15 +25,9 @@ class FileStatistics
     @Override
     public String toString(){
     	String res="filename:\t"+filename;
-    	res+="\nfileId:\t"+fileId;
-    	res+="\nmode:\t"+mode;
-    	res+="\nsize:\t"+filesize;
-    	res+="\nbytes written:\t"+bytesWritten+" bytes";
-    	res+="\nbytes read:\t"+bytesRead+" bytes";
-    	res+="\nbytes vector read:\t"+bytesVectorRead;
-    	res+="\nreads:\t"+reads;
-    	res+="\nVreads:\t"+vectorReads;
-    	res+="\nwrites:\t"+writes;
+    	res+="\nfileId:\t"+fileId+"\t\t\tmode:\t"+mode+"\t\t\tsize:\t"+filesize;
+    	res+="\nbytes written:\t"+bytesWritten+" bytes\t\t\tread:\t"+bytesRead+"\t\t\t vector read:\t"+bytesVectorRead;
+    	res+="\nreads:\t"+reads+"\t\t\tVreads:\t"+vectorReads+"\t\t\twrites:\t"+writes;
     	return res;
     	
     }
