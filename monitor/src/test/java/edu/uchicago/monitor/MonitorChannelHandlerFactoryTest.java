@@ -59,12 +59,13 @@ public class MonitorChannelHandlerFactoryTest {
 		
 		props.setProperty("summary", "atl-prod05.slac.stanford.edu:9931:10");
 		// props.setProperty("summary","uct2-int.uchicago.edu:9931:10");
-		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10");
-		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
+//		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10");
+		 props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
 
 		Collector c = new Collector(props);
 		for (int w = 0; w < 3000; w++) {
 			c.totBytesRead.getAndAdd(300 * 1024 * 1024); // 300 MB each 3 seconds
+			c.SendMapMessage((byte)0, 15145, "content");
 			try {
 				Thread.sleep(3 * 1000);
 			} catch (InterruptedException e) {

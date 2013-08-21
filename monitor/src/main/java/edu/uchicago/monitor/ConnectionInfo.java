@@ -1,5 +1,9 @@
 package edu.uchicago.monitor;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -7,35 +11,58 @@ public class ConnectionInfo {
 	final static Logger logger = LoggerFactory.getLogger(ConnectionInfo.class);
 	public int connectionID;
 	public UserInfo ui;
-	public int filesOpen;
 	public long duration;
+	private int serverPort;
+	public HashMap<Integer, FileStatistics> allFiles;
 
-	public Boolean disconnected; // initially this is 0. on disconnect will be changed to 1 and upon sending f-stream info will get removed.
-	
-	public ConnectionInfo(int connID) {
-		this.disconnected = false; 
+	public Boolean disconnected; // initially this is 0. on disconnect will be
+									// changed to 1 and upon sending f-stream
+									// info will get removed.
+
+	public ConnectionInfo(int connID, int DetailedLocalSendingPort) {
+		this.disconnected = false;
 		this.connectionID = connID;
+		this.serverPort = DetailedLocalSendingPort;
 		duration = System.currentTimeMillis();
-		filesOpen=0;
+		allFiles = new HashMap<Integer, FileStatistics>();
 	}
 
 	public void ConnectionClose() {
 		logger.info("CLOSED CONNECTION: " + connectionID + "   duration: " + (System.currentTimeMillis() - duration) / 1000);
-		this.disconnected = true; 
+		this.disconnected = true;
 	}
-	
-	public void logUserRequest(String name, int pid){
-		ui=new UserInfo(name, pid);
-	}	
-	
-	public void logUserResponse(String host, int port){
+
+	public void logUserRequest(String name, int pid) {
+		ui = new UserInfo(name, pid, serverPort);
+	}
+
+	public void logUserResponse(String host, int port) {
 		ui.setHostPort(host, port);
 		logger.info("LOGGED " + connectionID + " " + ui.getInfo());
 	}
 
-	public String toString() {
-		return "disconnected: "+disconnected+"\t\tfilesOpen:  "+filesOpen+"\t\tduration: " + (System.currentTimeMillis()-duration)/1000+"\n"+ui.toString();
+	public void addFile(Integer handle, FileStatistics fi) {
+		fi.state |= 0x0011;
+		allFiles.put(handle, fi);
 	}
-	
-	
+
+	public FileStatistics getFile(Integer handle) {
+		return allFiles.get(handle);
+	}
+
+	public void removeFile(Integer handle) {
+		allFiles.remove(handle);
+	}
+
+	public String toString() {
+		String ret = "disconnected: " + disconnected + "\t\tduration: " + (System.currentTimeMillis() - duration) / 1000 + "\n" + ui.toString();
+		Iterator<Entry<Integer, FileStatistics>> it = allFiles.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry fi = (Map.Entry) it.next();
+			ret += "\n handle: " + fi.getKey() + "\t path: " + fi.getValue().toString();
+		}
+		return ret;
+
+	}
+
 }

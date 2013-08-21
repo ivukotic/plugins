@@ -59,11 +59,12 @@ public class Collector {
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap cbsSummary;
-	private ConnectionlessBootstrap cbsDetailed;
-	private ConnectionlessBootstrap cbsMMSender;
-	private DatagramChannel dcMM;
+	// private ConnectionlessBootstrap cbsDetailed;
+	// private ConnectionlessBootstrap cbsMMSender;
+	// private DatagramChannel dcMM;
 
-	public final Map<Integer, FileStatistics> fmap = new ConcurrentHashMap<Integer, FileStatistics>();
+	// public final Map<Integer, FileStatistics> fmap = new
+	// ConcurrentHashMap<Integer, FileStatistics>();
 	public final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
@@ -74,8 +75,14 @@ public class Collector {
 	public AtomicLong totBytesWriten = new AtomicLong();
 	private CollectorAddresses ca = new CollectorAddresses();
 
+	private final UDPsender sender;
+	private UDPmessage mess;
+	private int DetailedLocalSendingPort;
+
 	Collector(Properties properties) {
 		this.properties = properties;
+		sender = new UDPsender();
+		mess = new UDPmessage();
 		init();
 	}
 
@@ -104,6 +111,9 @@ public class Collector {
 
 		ca.init(properties);
 		logger.info(ca.toString());
+
+		DetailedLocalSendingPort = sender.init(ca, mess);
+		sender.start();
 
 		tos = (int) (System.currentTimeMillis() / 1000L);
 		tosc = tos;
@@ -137,47 +147,11 @@ public class Collector {
 			logger.info("Setting summary monitoring local port (outbound) to: " + a.outboundport);
 		}
 
-		// this one are detailed
-
-		cbsDetailed = new ConnectionlessBootstrap(f);
-		cbsDetailed.setOption("localAddress", new InetSocketAddress(0));
-		cbsDetailed.setOption("broadcast", "true");
-		cbsDetailed.setOption("connectTimeoutMillis", 10000);
-
-		cbsDetailed.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(
-				// new StringEncoder(CharsetUtil.ISO_8859_1),
-				// new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
-
-		for (Address a : ca.detailed) {
-			Timer timer = new Timer();
-			timer.schedule(new SendDetailedStatisticsTask(a), 0, a.delay * 1000);
-			cbsDetailed.setOption("localAddress", new InetSocketAddress(a.outboundport));
-			logger.info("Setting detailed monitoring local port (outbound) to: " + a.outboundport);
-		}
-
-		// this one is for mapping messages
-
-		cbsMMSender = new ConnectionlessBootstrap(f);
-		cbsMMSender.setOption("localAddress", new InetSocketAddress(0));
-		cbsMMSender.setOption("broadcast", "true");
-		cbsMMSender.setOption("connectTimeoutMillis", 10000);
-
-		cbsMMSender.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
-
-		dcMM = (DatagramChannel) cbsMMSender.bind();
-
 		Timer timer = new Timer();
 		timer.schedule(new currentStatus(), 0, 5 * 60 * 1000);
+
+		Timer tDetailed = new Timer();
+		tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, 10000);
 
 	}
 
@@ -185,30 +159,22 @@ public class Collector {
 		connectionAttempts.getAndIncrement();
 	}
 
-	public void openFileEvent(int connectionId, FileStatistics fs) {
-		// Note that status may be null - only available if client requested it
-		logger.debug(">>>Opened " + connectionId + "\n" + fs.toString());
-		fs.state |= 0x0011; // set first and second bit
-		SendMapMessage((byte) 100, connectionId, fs.filename);
+	public void openFileEvent(int connectionId, int fileCounter, String path) {
+		// logger.debug(">>>Opened " + connectionId + "\n" + fs.toString());
+		SendMapMessage((byte) 100, connectionId + fileCounter, cmap.get(connectionId).ui.getInfo() + "\n" + path);
 	}
 
 	public void closeFileEvent(int connectionId, int fh) {
 		logger.debug(">>>Closed " + connectionId + "  file handle: " + fh);
-		if (fmap.get(fh) == null) {
-			logger.warn("File handle missing from the fmap. Should not happen except in case of recent restart. ");
-			return;
-		}
 		// if detailed monitoring is ON collector will remove it from map
 		if (ca.reportDetailed == false)
-			fmap.remove(fh);
-		else
-			fmap.get(fh).state |= 0x0004; // set third bit
+			cmap.get(connectionId).removeFile(fh);
 	}
 
 	public void connectedEvent(int connectionId) {
 		if (currentConnections.getAndIncrement() > maxConnections.get())
 			maxConnections.set(currentConnections.get());
-		cmap.put(connectionId, new ConnectionInfo(connectionId));
+		cmap.put(connectionId, new ConnectionInfo(connectionId, DetailedLocalSendingPort));
 	}
 
 	public void disconnectedEvent(int connectionId) {
@@ -217,7 +183,7 @@ public class Collector {
 		try {
 			logger.info("DISCONNECTED " + connectionId);
 			cmap.get(connectionId).ConnectionClose();
-			if (ca.reportDetailed == false) 
+			if (ca.reportDetailed == false)
 				cmap.remove(connectionId);
 		} catch (Exception ex) {
 			logger.warn("connection closed before being opened.");
@@ -231,7 +197,7 @@ public class Collector {
 		ConnectionInfo ci = cmap.get(connectionId);
 		if (ci != null) {
 			ci.logUserResponse(((InetSocketAddress) remoteAddress).getHostName(), ((InetSocketAddress) remoteAddress).getPort());
-			SendMapMessage((byte) 117, connectionId, ci.ui.getInfo());
+			SendMapMessage((byte) 117, connectionId, ci.ui.getFullInfo());
 		} else {
 			logger.error("Could not map connection " + connectionId + "to user.");
 		}
@@ -253,57 +219,25 @@ public class Collector {
 	// type - 117:u 100:d 105:i
 	public void SendMapMessage(byte mtype, Integer dictid, String content) {
 		logger.info("sending map message: " + dictid.toString() + " -> " + content);
-		for (Address a : ca.detailed) {
-			MapMessagesSender mms = new MapMessagesSender(a, mtype, dictid, content);
-			mms.start();
+
+		try {
+			pseq += 1;
+
+			short plen = (short) (12 + content.length());
+			ChannelBuffer db = dynamicBuffer(plen);
+
+			// main header
+			db.writeByte(mtype);
+			db.writeByte((byte) pseq);
+			db.writeShort(plen);
+			db.writeInt(tos);
+			db.writeInt(dictid); // this is dictID
+			db.writeBytes(content.getBytes());
+			mess.put(db);
+
+		} catch (Exception e) {
+			logger.error("unrecognized exception: " + e.getMessage());
 		}
-	}
-
-	private class MapMessagesSender extends Thread {
-		private InetSocketAddress destination;
-		private Integer dictid;
-		private String content;
-		private byte mtype;
-
-		MapMessagesSender(Address a, byte mtype, Integer dictid, String content) {
-			destination = new InetSocketAddress(a.address, a.port);
-			this.dictid = dictid;
-			this.content = content;
-			this.mtype = mtype;
-		}
-
-		public void run() {
-			logger.debug("Sending Map Message.");
-			try {
-				pseq += 1;
-
-				short plen = (short) (12 + content.length());
-				ChannelBuffer db = dynamicBuffer(plen);
-
-				// main header
-				db.writeByte(mtype);
-				db.writeByte((byte) pseq);
-				db.writeShort(plen);
-				db.writeInt(tos);
-				db.writeInt(dictid); // this is dictID
-				db.writeBytes(content.getBytes());
-				ChannelFuture f = dcMM.write(db, destination);
-
-				f.addListener(new ChannelFutureListener() {
-					public void operationComplete(ChannelFuture future) {
-						if (future.isSuccess())
-							logger.debug("Map Message sent! Type: " + mtype);
-						else {
-							logger.error("Map Message IO completed. did not send info:" + future.getCause());
-						}
-					}
-				});
-
-			} catch (Exception e) {
-				logger.error("unrecognized exception: " + e.getMessage());
-			}
-		}
-
 	}
 
 	private class SendSummaryStatisticsTask extends TimerTask {
@@ -378,13 +312,29 @@ public class Collector {
 		}
 	}
 
-	private class SendDetailedStatisticsTask extends TimerTask {
-		private InetSocketAddress destination;
-		private DatagramChannel c;
+	private class currentStatus extends TimerTask {
+		public void run() {
+			String res = new String();
+			res += "Report ----------------------------------------------------\n";
+			res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
+			res += "Current Connections:     " + currentConnections.toString() + "\n";
+			res += "Connections established: " + successfulConnections.toString() + "\n";
+			res += "Bytes Read:              " + totBytesRead.toString() + "\n";
+			res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
+			res += "-----------------------------------------------------------\n";
+			res += "Current connections:\n";
+			for (Map.Entry<Integer, ConnectionInfo> entry : cmap.entrySet()) {
+				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
+			}
+			logger.info(res);
+		}
+	}
 
-		SendDetailedStatisticsTask(Address a) {
-			destination = new InetSocketAddress(a.address, a.port);
-			c = (DatagramChannel) cbsDetailed.bind();
+	private class SendDetailedStatisticsProducer extends TimerTask {
+		private UDPmessage mess;
+
+		SendDetailedStatisticsProducer(UDPmessage m) {
+			this.mess = m;
 		}
 
 		public void run() {
@@ -396,7 +346,6 @@ public class Collector {
 			try {
 				fseq += 1;
 
-				logger.debug("fmap size: " + fmap.size());
 				short plen = (short) (24); // this is length of 2 mandatory
 											// headers
 				ChannelBuffer db = dynamicBuffer(plen);
@@ -426,122 +375,123 @@ public class Collector {
 				int subpackets = 0;
 				int xfrpackets = 0;
 
-				Iterator<Entry<Integer, FileStatistics>> it = fmap.entrySet().iterator();
+				Iterator<Entry<Integer, ConnectionInfo>> it = cmap.entrySet().iterator();
 				while (it.hasNext()) {
-					Map.Entry<Integer, FileStatistics> ent = (Map.Entry<Integer, FileStatistics>) it.next();
-					FileStatistics fs = (FileStatistics) ent.getValue();
-					Integer dictID = ent.getKey();// user_dictid - actually
-													// connectionID. should be
-													// changed later for proof.
 
-					if (dictID < 0)
-						continue; // file has been requested but not yet really
-									// opened.
+					Map.Entry<Integer, ConnectionInfo> cent = (Map.Entry<Integer, ConnectionInfo>) it.next();
 
-					if ((fs.state & 0x0001) > 0) { // file OPEN structure
-						// header
-						db.writeByte((byte) 1); // 1 - means isOpen
-						db.writeByte((byte) 0x01); // the lfn is present - 0x02
-													// is
-													// R/W
-						int len = 21 + fs.filename.length();
-						plen += len;
-						db.writeShort(len); // size
-						db.writeInt(fs.fileId); // replace with dictid of the
-												// file
+					Iterator<Entry<Integer, FileStatistics>> itf = cent.getValue().allFiles.entrySet().iterator();
+					while (itf.hasNext()) {
 
-						db.writeLong(fs.filesize); // filesize at open.
-						if (true) { // check if Filenames should be reported.
-							db.writeInt(dictID);// user_dictid
-							db.writeBytes(fs.filename.getBytes());// maybe
-																	// should be
-																	// forced to
-																	// "US-ASCII"?
-							db.writeByte(0x0); // to make this "C" string. end
-												// with
-												// null character.
+						Map.Entry<Integer, FileStatistics> fent = (Map.Entry<Integer, FileStatistics>) itf.next();
+						FileStatistics fs = (FileStatistics) fent.getValue();
+						Integer dictID = cent.getKey();
+
+						if ((fs.state & 0x0001) > 0) { // file OPEN structure
+							// header
+							db.writeByte((byte) 1); // 1 - means isOpen
+							db.writeByte((byte) 0x01); // the lfn is present -
+														// 0x02
+														// is
+														// R/W
+							int len = 21 + fs.filename.length();
+							plen += len;
+							db.writeShort(len); // size
+							db.writeInt(dictID + fs.fileCounter);
+							db.writeLong(fs.filesize); // filesize at open.
+							if (true) { // check if Filenames should be
+										// reported.
+								db.writeInt(dictID);// user_dictid
+								db.writeBytes(fs.filename.getBytes());
+								// to make this "C" string end
+								// with null character.
+								db.writeByte(0x0);
+							}
+
+							// reset the first bit
+							fs.state &= 0xFFFE;
+							subpackets += 1;
 						}
 
-						// reset the first bit
-						fs.state &= 0xFFFE;
+						db.writeByte((byte) 3); // 3 means isXfr
+						db.writeByte((byte) 0); // no meaning
+						db.writeShort(32); // 3*longlong + this header itself
+						db.writeInt(dictID + fs.fileCounter);
+						db.writeLong(fs.bytesRead.get());
+						db.writeLong(fs.bytesVectorRead.get());
+						db.writeLong(fs.bytesWritten.get());
+						plen += 32;
+						xfrpackets += 1;
 						subpackets += 1;
+
+						if ((fs.state & 0x0004) > 0) { // add fileclose
+														// structure
+							// header
+							db.writeByte((byte) 0); // 0 - means isClose
+
+							db.writeByte((byte) closedetails);
+
+							int packlength = 8;
+							switch (closedetails) {
+							case 0:
+								packlength += 24;
+								break;
+							case 1:
+								// do nothing
+								break;
+							case 2:
+								packlength += 24 + 48;
+								break;
+							case 6:
+								packlength += 24 + 48 + 64;
+								break;
+							}
+
+							db.writeShort(packlength); // size of this header
+							db.writeInt(dictID + fs.fileCounter);
+
+							if (closedetails != 1) {
+								db.writeLong(fs.bytesRead.get());
+								db.writeLong(fs.bytesVectorRead.get());
+								db.writeLong(fs.bytesWritten.get());
+							}
+
+							if (closedetails > 1) { // OPS
+								db.writeInt(fs.reads.get()); // reads
+								db.writeInt(fs.vectorReads.get()); // readVs
+								db.writeInt(fs.writes.get()); // writes
+								db.writeShort(11); // shortest readv segments
+								db.writeShort(12); // longest readv segments
+								db.writeLong(123456); // number of readv
+														// segments
+								db.writeInt(111000); // rdMin
+								db.writeInt(112000); // rdMax
+								db.writeInt(113000); // rvMin
+								db.writeInt(111001); // rvMax
+								db.writeInt(112002); // wrMin
+								db.writeInt(113003); // wrMax
+							}
+
+							if (closedetails == 6) { // SSQ
+								db.writeLong(123456); // number of readv
+														// segments
+								db.writeDouble(123.123);
+								db.writeLong(123456); // number of readv
+														// segments
+								db.writeDouble(123.123);
+								db.writeLong(123456); // number of readv
+														// segments
+								db.writeDouble(123.123);
+								db.writeLong(123456); // number of readv
+														// segments
+								db.writeDouble(123.123);
+							}
+							// remove it
+							itf.remove();
+							subpackets += 1;
+							plen += packlength;
+						}
 					}
-
-					db.writeByte((byte) 3); // 3 means isXfr
-					db.writeByte((byte) 0); // no meaning
-					db.writeShort(32); // 3*longlong + this header itself
-					db.writeInt(fs.fileId); // replace with dictid of the file
-					db.writeLong(fs.bytesRead.get());
-					db.writeLong(fs.bytesVectorRead.get());
-					db.writeLong(fs.bytesWritten.get());
-					plen += 32;
-					xfrpackets += 1;
-					subpackets += 1;
-
-					if ((fs.state & 0x0004) > 0) { // add fileclose structure
-						// header
-						db.writeByte((byte) 0); // 0 - means isClose
-
-						db.writeByte((byte) closedetails);
-
-						int packlength = 8;
-						switch (closedetails) {
-						case 0:
-							packlength += 24;
-							break;
-						case 1:
-							// do nothing
-							break;
-						case 2:
-							packlength += 24 + 48;
-							break;
-						case 6:
-							packlength += 24 + 48 + 64;
-							break;
-						}
-
-						db.writeShort(packlength); // size of this header
-						db.writeInt(fs.fileId); // replace with dictid of the
-												// file
-
-						if (closedetails != 1) {
-							db.writeLong(fs.bytesRead.get());
-							db.writeLong(fs.bytesVectorRead.get());
-							db.writeLong(fs.bytesWritten.get());
-						}
-
-						if (closedetails > 1) { // OPS
-							db.writeInt(fs.reads.get()); // reads
-							db.writeInt(fs.vectorReads.get()); // readVs
-							db.writeInt(fs.writes.get()); // writes
-							db.writeShort(11); // shortest readv segments
-							db.writeShort(12); // longest readv segments
-							db.writeLong(123456); // number of readv segments
-							db.writeInt(111000); // rdMin
-							db.writeInt(112000); // rdMax
-							db.writeInt(113000); // rvMin
-							db.writeInt(111001); // rvMax
-							db.writeInt(112002); // wrMin
-							db.writeInt(113003); // wrMax
-						}
-
-						if (closedetails == 6) { // SSQ
-							db.writeLong(123456); // number of readv segments
-							db.writeDouble(123.123);
-							db.writeLong(123456); // number of readv segments
-							db.writeDouble(123.123);
-							db.writeLong(123456); // number of readv segments
-							db.writeDouble(123.123);
-							db.writeLong(123456); // number of readv segments
-							db.writeDouble(123.123);
-						}
-
-						// remove it
-						it.remove();
-						subpackets += 1;
-						plen += packlength;
-					}
-
 				}
 
 				// disconnects
@@ -563,48 +513,13 @@ public class Collector {
 				db.setShort(2, plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
-
-				ChannelFuture f = c.write(db, destination);
-				f.addListener(new ChannelFutureListener() {
-					public void operationComplete(ChannelFuture future) {
-						if (future.isSuccess())
-							logger.debug("detailed stream IO completed. success!");
-						else {
-							logger.error("detailed stream IO completed. did not send info:" + future.getCause());
-						}
-						// future.getChannel().close();
-					}
-				});
+				mess.put(db);
 
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending f-stream: " + e.getMessage());
 			}
 		}
 
-	}
-
-	private class currentStatus extends TimerTask {
-		public void run() {
-			String res = new String();
-			res += "Report ----------------------------------------------------\n";
-			res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
-			res += "Current Connections:     " + currentConnections.toString() + "\n";
-			res += "Connections established: " + successfulConnections.toString() + "\n";
-			res += "Bytes Read:              " + totBytesRead.toString() + "\n";
-			res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
-			res += "-----------------------------------------------------------\n";
-			res += "Current connections:\n";
-			for (Map.Entry<Integer, ConnectionInfo> entry : cmap.entrySet()) {
-				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
-			}
-			logger.info(res);
-			res = "";
-			res += "Current openfiles:\n";
-			for (Map.Entry<Integer, FileStatistics> entry : fmap.entrySet()) {
-				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
-			}
-			logger.info(res);
-		}
 	}
 
 }

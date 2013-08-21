@@ -1,7 +1,5 @@
 package edu.uchicago.monitor;
 
-import java.util.HashMap;
-import java.util.Map;
 import org.dcache.xrootd.protocol.messages.AbstractResponseMessage;
 import org.dcache.xrootd.protocol.messages.CloseRequest;
 import org.dcache.xrootd.protocol.messages.GenericReadRequestMessage.EmbeddedReadRequest;
@@ -30,8 +28,8 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
 	private int connId;
-	private static int fileCounter = 1;
-
+	private int fileCounter=0;
+	
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
 	}
@@ -48,8 +46,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			if (message instanceof ReadRequest) {
 				ReadRequest rr = (ReadRequest) message;
-				// FileStatistics fs = collector.fmap.get(rr.getFileHandle());
-				FileStatistics fs = collector.fmap.get(connId);
+				FileStatistics fs = collector.cmap.get(connId).getFile(rr.getFileHandle());
 				if (fs != null) {
 					fs.bytesRead.getAndAdd(rr.bytesToRead());
 					fs.reads.getAndIncrement();
@@ -60,38 +57,19 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else if (message instanceof ReadVRequest) {
-				// this is very strange construction. if getFileHandle is always
-				// 0
-				// when fileHandle is not 0? Can someone ask for vector read
-				// from 2 files simultaneously?
-
-				FileStatistics fs = collector.fmap.get(connId);
-				fs.vectorReads.getAndIncrement();
-				
-				// not sure if this bellow works.
 				ReadVRequest rr = (ReadVRequest) message;
+
 				EmbeddedReadRequest[] err = rr.getReadRequestList();
-				Map<Integer, Integer> fts = new HashMap<Integer, Integer>();
+				long totVread = 0;
 				for (int i = 0; i < rr.NumberOfReads(); i++) {
-					Integer fh = err[i].getFileHandle();
-					Integer val = fts.get(fh);
-					if (val == null) {
-						fts.put(fh, 0);
-					} else {
-						val += err[i].BytesToRead();
-					}
+					FileStatistics fs = collector.cmap.get(connId).getFile(err[i].getFileHandle());
+					fs.vectorReads.getAndIncrement();
+					fs.bytesVectorRead.getAndAdd(err[i].BytesToRead());
+					totVread += err[i].BytesToRead();
 				}
-				int totVread = 0;
-				for (Map.Entry<Integer, Integer> entry : fts.entrySet()) {
-					// FileStatistics fs = collector.fmap.get(entry.getKey());
-					FileStatistics fs1 = collector.fmap.get(connId);
-					if (fs1 != null) {
-						fs1.bytesRead.getAndAdd(entry.getValue());
-						fs1.reads.getAndIncrement();
-						totVread += entry.getValue();
-					}
-				}
+
 				collector.totBytesRead.getAndAdd(totVread);
+
 			}
 
 			else if (message instanceof LoginRequest) {
@@ -100,7 +78,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				String user = lr.getUserName();
 				int userpid = lr.getPID();
 				logger.info("LOGIN REQUEST   " + connId + "    client username: " + user + "   protocol: " + protocol + "     client PID: " + userpid);
-				collector.cmap.get(connId).logUserRequest(user,userpid);
+				collector.cmap.get(connId).logUserRequest(user, userpid);
 			}
 
 			// from OpenRequest we get:
@@ -114,34 +92,37 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// at negative streamId. If really opened it will be removed and
 				// replaced with
 				// positive file dictID.
-				OpenRequest or = (OpenRequest) message;
-				int mode = 1;
-				if (or.isReadOnly())
-					mode = 1;
-				else
-					mode = 0; // not correct
-				FileStatistics fs = new FileStatistics(fileCounter);
-				fileCounter = (fileCounter + 1) % 2147483647;
-				fs.filename = or.getPath();
-				logger.warn("FILE OPEN REQUEST    connId: " + connId + "   readonly: " + mode + "   path :" + fs.filename);
-				fs.mode = mode;
-				collector.fmap.put(-connId, fs);
+				// OpenRequest or = (OpenRequest) message;
+				// int mode = 1;
+				// if (or.isReadOnly())
+				// mode = 1;
+				// else
+				// mode = 0; // not correct
+				// FileStatistics fs = new FileStatistics(fileCounter);
+				// fileCounter = (fileCounter + 1) % 2147483647;
+				// fs.filename = or.getPath();
+				// logger.warn("FILE OPEN REQUEST    connId: " + connId +
+				// "   readonly: " + mode + "   path :" + fs.filename);
+				// fs.mode = mode;
+				// // collector.fmap.put(-connId, fs);
+				// collector.cmap.get(connId).addFile(fs);
 			}
 
 			else if (message instanceof CloseRequest) {
-				// CloseRequest cr = (CloseRequest) message;
+				 CloseRequest cr = (CloseRequest) message;
 				logger.info("FILE CLOSE REQUEST ------- connId:     " + connId);
-				// collector.closeEvent(connId, cr.getFileHandle());
+				 collector.cmap.get(connId).getFile(cr.getFileHandle()).close();
 				collector.closeFileEvent(connId, connId);
 			}
 
 			else if (message instanceof WriteRequest) {
 				WriteRequest wr = (WriteRequest) message;
-				// FileStatistics fs = collector.fmap.get(wr.getFileHandle());
-				FileStatistics fs = collector.fmap.get(connId);
-				fs.bytesWritten.getAndAdd(wr.getDataLength());
-				fs.writes.getAndIncrement();
-				collector.totBytesWriten.getAndAdd(wr.getDataLength());
+				FileStatistics fs = collector.cmap.get(connId).getFile(wr.getFileHandle());
+				if (fs != null) {
+					fs.bytesWritten.getAndAdd(wr.getDataLength());
+					fs.writes.getAndIncrement();
+					collector.totBytesWriten.getAndAdd(wr.getDataLength());
+				}
 			} else if (message instanceof ProtocolRequest) {
 				ProtocolRequest req = (ProtocolRequest) message;
 				logger.info("ProtocolRequest streamId: " + req.getStreamId() + "\treqID: " + req.getRequestId() + "\t data:" + req.toString());
@@ -242,32 +223,31 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			// // for whatever reason this does not happen
 			// }
 
+			// Integer streamID = OR.getRequest().getStreamId();
+			// logger.info("FILE OPEN RESPONSE --------- stream Id: " +
+			// streamID);
+			// logger.info("filehandle: " + OR.getFileHandle());
+			// logger.info("filesize  : " + OR.getFileStatus().getSize());
+			// logger.info("fileid    : " + OR.getFileStatus().getId()); //
+			// usually 0 ?!
+			// logger.info("filestatus: " + OR.getFileStatus().toString());
+
 			if (message instanceof OpenResponse) {
 				OpenResponse OR = (OpenResponse) message;
-				// Integer streamID = OR.getRequest().getStreamId();
-				// logger.info("FILE OPEN RESPONSE --------- stream Id: " +
-				// streamID);
-				// logger.info("filehandle: " + OR.getFileHandle());
-				// logger.info("filesize  : " + OR.getFileStatus().getSize());
-				// logger.info("fileid    : " + OR.getFileStatus().getId()); //
-				// usually 0 ?!
-				// logger.info("filestatus: " + OR.getFileStatus().toString());
-				FileStatistics fs = collector.fmap.get(-connId);
-				if (fs == null) {
-					logger.error("Serious problem: can not find file with handle " + connId);
-				}
+				OpenRequest or = (OpenRequest) OR.getRequest();
+				int mode = 1;
+				if (or.isReadOnly())
+					mode = 1;
+				else
+					mode = 0; // not correct
+				fileCounter+=1%9999999;
+				FileStatistics fs = new FileStatistics(fileCounter);
+				fs.filename = or.getPath();
+				fs.mode = mode;
 				fs.filesize = OR.getFileStatus().getSize();
-				// collector.fmap.put(OR.getFileHandle(), fs);
-
-				if (collector.cmap.get(connId).filesOpen > 0) {
-					logger.warn("Connection: " + connId + " already had a file opened. Can't add new one.");
-					collector.cmap.get(connId).filesOpen = +1;
-				} else {
-					collector.fmap.put(connId, fs);
-					collector.openFileEvent(connId, fs);
-				}
-				collector.fmap.remove(-connId);
-				// logger.info("-----------------------------------------------");
+				logger.warn("FILE OPEN RESPONSE    connId: " + connId + "   readonly: " + mode + "   path :" + fs.filename);
+				collector.cmap.get(connId).addFile(OR.getFileHandle(), fs);
+				collector.openFileEvent(connId, fileCounter, fs.filename);
 			}
 
 			else if (message instanceof AbstractResponseMessage) {
