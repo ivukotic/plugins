@@ -28,8 +28,8 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
 	private int connId;
-	private int fileCounter=0;
-	
+	private static int fileCounter = 0;
+
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
 	}
@@ -109,9 +109,9 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else if (message instanceof CloseRequest) {
-				 CloseRequest cr = (CloseRequest) message;
+				CloseRequest cr = (CloseRequest) message;
 				logger.info("FILE CLOSE REQUEST ------- connId:     " + connId);
-				 collector.cmap.get(connId).getFile(cr.getFileHandle()).close();
+				collector.cmap.get(connId).getFile(cr.getFileHandle()).close();
 				collector.closeFileEvent(connId, connId);
 			}
 
@@ -124,8 +124,10 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					collector.totBytesWriten.getAndAdd(wr.getDataLength());
 				}
 			} else if (message instanceof ProtocolRequest) {
-				ProtocolRequest req = (ProtocolRequest) message;
-				logger.info("ProtocolRequest streamId: " + req.getStreamId() + "\treqID: " + req.getRequestId() + "\t data:" + req.toString());
+				// ProtocolRequest req = (ProtocolRequest) message;
+				// logger.info("ProtocolRequest streamId: " + req.getStreamId()
+				// + "\treqID: " + req.getRequestId() + "\t data:" +
+				// req.toString());
 			} else if (message instanceof XrootdRequest) {
 				XrootdRequest req = (XrootdRequest) message;
 				logger.info("I-> streamID: " + req.getStreamId() + "\treqID: " + req.getRequestId() + "\t data:" + req.toString());
@@ -154,11 +156,11 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else if (se.getState() == ChannelState.BOUND) {
-				if (se.getValue() != null) {
-					logger.debug("CHANNEL BOUND EVENT " + se.getValue());
-				} else {
-					logger.debug("CHANNEL BOUND EVENT with null Value. Should not happen.");
-				}
+				// if (se.getValue() != null) {
+				// logger.debug("CHANNEL BOUND EVENT " + se.getValue());
+				// } else {
+				// logger.debug("CHANNEL BOUND EVENT with null Value. Should not happen.");
+				// }
 			}
 
 			else if (se.getState() == ChannelState.CONNECTED) {
@@ -171,8 +173,8 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else if (se.getState() == ChannelState.INTEREST_OPS) {
-				// not sure why but this happens very often on real server.
-				logger.debug("INTEREST_CHANGED");
+				// // not sure why but this happens very often on real server.
+				// logger.debug("INTEREST_CHANGED");
 			}
 
 			else {
@@ -223,15 +225,6 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			// // for whatever reason this does not happen
 			// }
 
-			// Integer streamID = OR.getRequest().getStreamId();
-			// logger.info("FILE OPEN RESPONSE --------- stream Id: " +
-			// streamID);
-			// logger.info("filehandle: " + OR.getFileHandle());
-			// logger.info("filesize  : " + OR.getFileStatus().getSize());
-			// logger.info("fileid    : " + OR.getFileStatus().getId()); //
-			// usually 0 ?!
-			// logger.info("filestatus: " + OR.getFileStatus().toString());
-
 			if (message instanceof OpenResponse) {
 				OpenResponse OR = (OpenResponse) message;
 				OpenRequest or = (OpenRequest) OR.getRequest();
@@ -240,14 +233,13 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					mode = 1;
 				else
 					mode = 0; // not correct
-				fileCounter+=1%9999999;
+				fileCounter = (fileCounter + 1) % 9999999;
 				FileStatistics fs = new FileStatistics(fileCounter);
 				fs.filename = or.getPath();
 				fs.mode = mode;
 				fs.filesize = OR.getFileStatus().getSize();
-				logger.warn("FILE OPEN RESPONSE    connId: " + connId + "   readonly: " + mode + "   path :" + fs.filename);
+				logger.warn("FILE OPEN RESPONSE    connId: " + connId + "   readonly: " + mode + "   path :" + fs.filename + "  fileCounter: " + fs.fileCounter);
 				collector.cmap.get(connId).addFile(OR.getFileHandle(), fs);
-				collector.openFileEvent(connId, fileCounter, fs.filename);
 			}
 
 			else if (message instanceof AbstractResponseMessage) {

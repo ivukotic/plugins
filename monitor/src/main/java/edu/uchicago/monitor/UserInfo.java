@@ -23,7 +23,7 @@ public class UserInfo {
 	}
 	
 	public String getFullInfo() {
-		return name + "." + pid + ":" + ((long) pid << 16 | serverPort) + "@" + host + "\n&p=X509&n=" + name + "&h=" + host + "&o=&r=&g=&m="+name;
+		return name + "." + pid + ":" + ((long) pid << 16 | serverPort) + "@" + host + "\n&p=X509&n=" + name + "&h=" + host + "&o=&r=&g=&m=/CN="+name;
 	}
 
 	public String toString() {

@@ -59,16 +59,9 @@ public class Collector {
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap cbsSummary;
-	// private ConnectionlessBootstrap cbsDetailed;
-	// private ConnectionlessBootstrap cbsMMSender;
-	// private DatagramChannel dcMM;
-
-	// public final Map<Integer, FileStatistics> fmap = new
-	// ConcurrentHashMap<Integer, FileStatistics>();
 	public final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
-	private AtomicInteger currentConnections = new AtomicInteger();
 	private AtomicInteger successfulConnections = new AtomicInteger();
 	private AtomicInteger maxConnections = new AtomicInteger();
 	public AtomicLong totBytesRead = new AtomicLong();
@@ -148,10 +141,12 @@ public class Collector {
 		}
 
 		Timer timer = new Timer();
+		// this is used for printing out state and sending "=" stream
 		timer.schedule(new currentStatus(), 0, 5 * 60 * 1000);
 
 		Timer tDetailed = new Timer();
-		tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, 10000);
+		if (ca.reportDetailed == true)
+			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, ca.detailed.get(0).delay*1000);
 
 	}
 
@@ -159,10 +154,6 @@ public class Collector {
 		connectionAttempts.getAndIncrement();
 	}
 
-	public void openFileEvent(int connectionId, int fileCounter, String path) {
-		// logger.debug(">>>Opened " + connectionId + "\n" + fs.toString());
-		SendMapMessage((byte) 100, connectionId + fileCounter, cmap.get(connectionId).ui.getInfo() + "\n" + path);
-	}
 
 	public void closeFileEvent(int connectionId, int fh) {
 		logger.debug(">>>Closed " + connectionId + "  file handle: " + fh);
@@ -172,13 +163,12 @@ public class Collector {
 	}
 
 	public void connectedEvent(int connectionId) {
-		if (currentConnections.getAndIncrement() > maxConnections.get())
-			maxConnections.set(currentConnections.get());
+		if (cmap.size() > maxConnections.get())
+			maxConnections.set(cmap.size());
 		cmap.put(connectionId, new ConnectionInfo(connectionId, DetailedLocalSendingPort));
 	}
 
 	public void disconnectedEvent(int connectionId) {
-		currentConnections.getAndDecrement();
 		successfulConnections.getAndIncrement();
 		try {
 			logger.info("DISCONNECTED " + connectionId);
@@ -203,22 +193,9 @@ public class Collector {
 		}
 	}
 
-	@Override
-	public String toString() {
-		String res = new String();
-		res += "SUMMARY ----------------------------------\n";
-		res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
-		res += "Current Connections:     " + currentConnections.toString() + "\n";
-		res += "Successful Connections:  " + successfulConnections.toString() + "\n";
-		res += "Bytes Read:              " + totBytesRead.toString() + "\n";
-		res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
-		res += "SUMMARY ----------------------------------\n";
-		return res;
-	}
-
 	// type - 117:u 100:d 105:i
 	public void SendMapMessage(byte mtype, Integer dictid, String content) {
-		logger.info("sending map message: " + dictid.toString() + " -> " + content);
+		logger.debug("sending map message: " + dictid.toString() + " -> " + content);
 
 		try {
 			pseq += 1;
@@ -282,7 +259,7 @@ public class Collector {
 				String sgen = SGENstart + "<toe>" + curTime + "</toe>" + SGENend;
 
 				String link = LINKstart;
-				link += "<num>" + currentConnections.toString() + "</num>";
+				link += "<num>" + cmap.size() + "</num>";
 				link += "<maxn>" + maxConnections.toString() + "</maxn>";
 				link += "<tot>" + connectionAttempts.toString() + "</tot>";
 				link += "<in>" + totBytesWriten.toString() + "</in>";
@@ -314,10 +291,14 @@ public class Collector {
 
 	private class currentStatus extends TimerTask {
 		public void run() {
+			
+			// this is "=" stream. Collector neglects all the info in it. If 5 of these are not received it knows server is down
+			// so it cleans up all the connections.
+			SendMapMessage((byte) 61, 0, "user.pid:sid@host\n&pgm=dCacheXrootdDoor&ver=5.0.0&inst=anon&port=0&site="+sitename);
 			String res = new String();
 			res += "Report ----------------------------------------------------\n";
 			res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
-			res += "Current Connections:     " + currentConnections.toString() + "\n";
+			res += "Current Connections:     " + cmap.size() + "\n";
 			res += "Connections established: " + successfulConnections.toString() + "\n";
 			res += "Bytes Read:              " + totBytesRead.toString() + "\n";
 			res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
@@ -387,7 +368,8 @@ public class Collector {
 						FileStatistics fs = (FileStatistics) fent.getValue();
 						Integer dictID = cent.getKey();
 
-						if ((fs.state & 0x0001) > 0) { // file OPEN structure
+						// add OPEN structure
+						if ((fs.state & 0x0001) > 0) {
 							// header
 							db.writeByte((byte) 1); // 1 - means isOpen
 							db.writeByte((byte) 0x01); // the lfn is present -
@@ -397,7 +379,8 @@ public class Collector {
 							int len = 21 + fs.filename.length();
 							plen += len;
 							db.writeShort(len); // size
-							db.writeInt(dictID + fs.fileCounter);
+							db.writeInt(fs.fileCounter);
+							logger.debug("FOpened: " + fs.fileCounter);
 							db.writeLong(fs.filesize); // filesize at open.
 							if (true) { // check if Filenames should be
 										// reported.
@@ -416,7 +399,8 @@ public class Collector {
 						db.writeByte((byte) 3); // 3 means isXfr
 						db.writeByte((byte) 0); // no meaning
 						db.writeShort(32); // 3*longlong + this header itself
-						db.writeInt(dictID + fs.fileCounter);
+						logger.debug("FTransfer: " + fs.fileCounter);
+						db.writeInt(fs.fileCounter);
 						db.writeLong(fs.bytesRead.get());
 						db.writeLong(fs.bytesVectorRead.get());
 						db.writeLong(fs.bytesWritten.get());
@@ -424,8 +408,8 @@ public class Collector {
 						xfrpackets += 1;
 						subpackets += 1;
 
-						if ((fs.state & 0x0004) > 0) { // add fileclose
-														// structure
+						// add CLOSE structure
+						if ((fs.state & 0x0004) > 0) {
 							// header
 							db.writeByte((byte) 0); // 0 - means isClose
 
@@ -448,7 +432,8 @@ public class Collector {
 							}
 
 							db.writeShort(packlength); // size of this header
-							db.writeInt(dictID + fs.fileCounter);
+							logger.debug("FClosed: " + fs.fileCounter);
+							db.writeInt(fs.fileCounter);
 
 							if (closedetails != 1) {
 								db.writeLong(fs.bytesRead.get());
@@ -496,9 +481,13 @@ public class Collector {
 
 				// disconnects
 				Iterator<Entry<Integer, ConnectionInfo>> iter = cmap.entrySet().iterator();
+				long ct = System.currentTimeMillis();
 				while (iter.hasNext()) {
 					Map.Entry<Integer, ConnectionInfo> ent = (Map.Entry<Integer, ConnectionInfo>) iter.next();
-					if (ent.getValue().disconnected == true) {
+					// this also closes connection if longer than 5 days
+					if (ent.getValue().disconnected == true || (ct - ent.getValue().duration) > 432000000) {
+
+						logger.debug("ReportConnClose: " + ent.getKey());
 						db.writeByte((byte) 4); // 4 - means isDisc
 						db.writeByte((byte) 0); // no meaning
 						db.writeShort(8); // size

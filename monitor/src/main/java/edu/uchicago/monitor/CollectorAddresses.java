@@ -71,6 +71,7 @@ public class CollectorAddresses {
 			res += "Detailed information will be sent to: \n";
 			for (Address a : detailed) {
 				res += a.toString();
+				break;
 			}
 		} else
 			res += "Detailed information will not be sent.\n";

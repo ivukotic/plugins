@@ -6,6 +6,7 @@ import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
+import org.jboss.netty.channel.ChannelStateEvent;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
 import org.jboss.netty.handler.codec.serialization.ObjectDecoder;
@@ -28,23 +29,30 @@ public class MonitorChannelHandlerFactoryTest {
 	public void testMonitorChannelHandlerFactory() {
 		// fail("Not yet implemented");
 		logger.info("testing creation of monitor handler.");
-		// MonitorChannelHandlerProvider mchp=new
-		// MonitorChannelHandlerProvider();
-		// Properties props=new Properties();
-		// //
-		// props.setProperty("summary","atl-prod05.slac.stanford.edu:9931:10");
-		// // props.setProperty("summary","uct2-int.uchicago.edu:9931:10");
-		// //
-		// props.setProperty("detailed","atl-prod05.slac.stanford.edu:9930:10");
-		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
-		// ChannelHandlerFactory mchf=mchp.createFactory("edu.uchicago.monitor",
-		// props);
-		// logger.info(mchf.getDescription());
-		// try {
-		// Thread.sleep(350000);
-		// } catch (InterruptedException e) {
-		// e.printStackTrace();
-		// }
+		
+
+//		Properties props = new Properties();
+//		props.setProperty("site", "MWT2_UC");
+//		props.setProperty("servername", "ilijasMac.uchicago.edu");
+//		props.setProperty("summary", "atl-prod05.slac.stanford.edu:9931:10");
+//		// props.setProperty("summary","uct2-int.uchicago.edu:9931:10");
+//		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10");
+//		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
+//		
+//		MonitorChannelHandlerProvider mchp = new MonitorChannelHandlerProvider();
+//		ChannelHandlerFactory mchf = mchp.createFactory("edu.uchicago.monitor", props);
+//		logger.info(mchf.getDescription());
+//		MonitorChannelHandler mch = (MonitorChannelHandler) mchf.createHandler();
+//
+//		for (int w = 0; w < 3000; w++) {
+//			
+//			try {
+//				Thread.sleep(3 * 1000);
+//			} catch (InterruptedException e) {
+//				e.printStackTrace();
+//			}
+//		}
+		
 		logger.info("done.");
 		logger.info("===================================================================");
 	}
@@ -56,16 +64,24 @@ public class MonitorChannelHandlerFactoryTest {
 		Properties props = new Properties();
 		props.setProperty("site", "MWT2_UC");
 		props.setProperty("servername", "ilijasMac.uchicago.edu");
-		
+
 		props.setProperty("summary", "atl-prod05.slac.stanford.edu:9931:10");
 		// props.setProperty("summary","uct2-int.uchicago.edu:9931:10");
-//		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10");
-		 props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
+		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10:9999");
+		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
 
+		int cid=123456;
 		Collector c = new Collector(props);
 		for (int w = 0; w < 3000; w++) {
-			c.totBytesRead.getAndAdd(300 * 1024 * 1024); // 300 MB each 3 seconds
-			c.SendMapMessage((byte)0, 15145, "content");
+
+			// user logged in message "u"
+//			c.SendMapMessage((byte) 117, cid, "");
+			// open file map message "d"
+//			c.SendMapMessage((byte) 100, 123456 + 0, "" );
+
+			c.totBytesRead.getAndAdd(300 * 1024 * 1024); // 300 MB each 3
+															// seconds
+//			c.SendMapMessage((byte) 0, 15145, "content");
 			try {
 				Thread.sleep(3 * 1000);
 			} catch (InterruptedException e) {

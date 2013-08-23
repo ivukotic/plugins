@@ -42,7 +42,7 @@ public class ConnectionInfo {
 	}
 
 	public void addFile(Integer handle, FileStatistics fi) {
-		fi.state |= 0x0011;
+		fi.state |= 0x0003;
 		allFiles.put(handle, fi);
 	}
 
