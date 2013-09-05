@@ -72,7 +72,7 @@ public class MonitorChannelHandlerFactoryTest {
 
 		int cid=123456;
 		Collector c = new Collector(props);
-		for (int w = 0; w < 3000; w++) {
+		for (int w = 0; w < 3; w++) {
 
 			// user logged in message "u"
 //			c.SendMapMessage((byte) 117, cid, "");
