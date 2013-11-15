@@ -4,7 +4,6 @@ import java.io.File;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
@@ -146,14 +145,13 @@ public class Collector {
 
 		Timer tDetailed = new Timer();
 		if (ca.reportDetailed == true)
-			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, ca.detailed.get(0).delay*1000);
+			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, ca.detailed.get(0).delay * 1000);
 
 	}
 
 	public void addConnectionAttempt() {
 		connectionAttempts.getAndIncrement();
 	}
-
 
 	public void closeFileEvent(int connectionId, int fh) {
 		logger.debug(">>>Closed {}  file handle:{}", connectionId, fh);
@@ -196,7 +194,6 @@ public class Collector {
 	// type - 117:u 100:d 105:i
 	public void SendMapMessage(byte mtype, Integer dictid, String content) {
 		logger.debug("sending map message: {} -> {}", dictid.toString(), content);
-
 		try {
 			pseq += 1;
 
@@ -291,10 +288,11 @@ public class Collector {
 
 	private class currentStatus extends TimerTask {
 		public void run() {
-			
-			// this is "=" stream. Collector neglects all the info in it. If 5 of these are not received it knows server is down
+
+			// this is "=" stream. Collector neglects all the info in it. If 5
+			// of these are not received it knows server is down
 			// so it cleans up all the connections.
-			SendMapMessage((byte) 61, 0, "user.pid:sid@host\n&pgm=dCacheXrootdDoor&ver=5.0.0&inst=anon&port=0&site="+sitename);
+			SendMapMessage((byte) 61, 0, "user.pid:sid@host\n&pgm=dCacheXrootdDoor&ver=5.0.0&inst=anon&port=0&site=" + sitename);
 			String res = new String();
 			res += "Report ----------------------------------------------------\n";
 			res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
@@ -356,15 +354,10 @@ public class Collector {
 				int subpackets = 0;
 				int xfrpackets = 0;
 
-				Iterator<Entry<Integer, ConnectionInfo>> it = cmap.entrySet().iterator();
-				while (it.hasNext()) {
+				for (Map.Entry<Integer, ConnectionInfo> cent : cmap.entrySet()) {
 
-					Map.Entry<Integer, ConnectionInfo> cent = (Map.Entry<Integer, ConnectionInfo>) it.next();
+					for (Entry<Integer, FileStatistics> fent : cent.getValue().allFiles.entrySet()) {
 
-					Iterator<Entry<Integer, FileStatistics>> itf = cent.getValue().allFiles.entrySet().iterator();
-					while (itf.hasNext()) {
-
-						Map.Entry<Integer, FileStatistics> fent = (Map.Entry<Integer, FileStatistics>) itf.next();
 						FileStatistics fs = (FileStatistics) fent.getValue();
 						Integer dictID = cent.getKey();
 
@@ -472,7 +465,7 @@ public class Collector {
 								db.writeDouble(123.123);
 							}
 							// remove it
-							itf.remove();
+							cent.getValue().allFiles.remove(fent);
 							subpackets += 1;
 							plen += packlength;
 						}
@@ -480,10 +473,8 @@ public class Collector {
 				}
 
 				// disconnects
-				Iterator<Entry<Integer, ConnectionInfo>> iter = cmap.entrySet().iterator();
 				long ct = System.currentTimeMillis();
-				while (iter.hasNext()) {
-					Map.Entry<Integer, ConnectionInfo> ent = (Map.Entry<Integer, ConnectionInfo>) iter.next();
+				for (Map.Entry<Integer, ConnectionInfo> ent : cmap.entrySet()) {
 					// this also closes connection if longer than 5 days
 					if (ent.getValue().disconnected == true || (ct - ent.getValue().duration) > 432000000) {
 
@@ -494,18 +485,18 @@ public class Collector {
 						db.writeInt(ent.getKey()); // userID
 						subpackets += 1;
 						plen += 8;
-						iter.remove();
+						cmap.remove(ent);
 					}
 				}
 
-				logger.debug("message length: {} \t buffer length: {}",plen, db.writableBytes());
+				logger.debug("message length: {} \t buffer length: {}", plen, db.writableBytes());
 				db.setShort(2, plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
 				mess.put(db);
 
 			} catch (Exception e) {
-				logger.error("unrecognized exception in sending f-stream:{} ",e.getMessage());
+				logger.error("unrecognized exception in sending f-stream:{} ", e.getMessage());
 			}
 		}
 

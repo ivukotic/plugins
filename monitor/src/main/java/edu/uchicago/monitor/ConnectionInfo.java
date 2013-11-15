@@ -1,9 +1,7 @@
 package edu.uchicago.monitor;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
-import java.util.Map.Entry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,9 +54,7 @@ public class ConnectionInfo {
 
 	public String toString() {
 		String ret = "disconnected: " + disconnected + "\t\tduration: " + (System.currentTimeMillis() - duration) / 1000 + "\n" + ui.toString();
-		Iterator<Entry<Integer, FileStatistics>> it = allFiles.entrySet().iterator();
-		while (it.hasNext()) {
-			Map.Entry fi = (Map.Entry) it.next();
+		for(Map.Entry<Integer, FileStatistics> fi:allFiles.entrySet()){
 			ret += "\n handle: " + fi.getKey() + "\t path: " + fi.getValue().toString();
 		}
 		return ret;

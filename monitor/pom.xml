@@ -36,14 +36,14 @@
       <scope>test</scope>
     </dependency>
     <dependency>
-        <groupId>org.dcache</groupId>
-        <artifactId>xrootd4j</artifactId>
-        <version>1.2.2</version>
-    </dependency>
-    <dependency>
     	<groupId>ch.qos.logback</groupId>
     	<artifactId>logback-classic</artifactId>
     	<version>1.0.12</version>
+    </dependency>
+    <dependency>
+        <groupId>org.dcache</groupId>
+        <artifactId>xrootd4j</artifactId>
+        <version>1.2.3</version>
     </dependency>
   </dependencies>
 

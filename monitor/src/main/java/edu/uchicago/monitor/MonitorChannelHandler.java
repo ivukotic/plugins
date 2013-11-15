@@ -30,7 +30,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
 	private int connId;
-	private static AtomicInteger fileCounter  = new AtomicInteger();;
+	private static AtomicInteger fileCounter = new AtomicInteger();;
 
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
@@ -79,7 +79,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				int protocol = lr.getClientProtocolVersion();
 				String user = lr.getUserName();
 				int userpid = lr.getPID();
-				logger.info("LOGIN REQUEST   {}   client username: {}    protocol: " + protocol + "     client PID: " + userpid, connId, user);
+				logger.info("LOGIN REQUEST   {}   client username: {}    protocol: {}     client PID: {}", connId, user, protocol, userpid);
 				collector.cmap.get(connId).logUserRequest(user, userpid);
 			}
 
@@ -132,7 +132,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// req.toString());
 			} else if (message instanceof XrootdRequest) {
 				XrootdRequest req = (XrootdRequest) message;
-				logger.info("I-> streamID: {} \treqID: {}\t data:" + req.toString(), req.getStreamId(), req.getRequestId());
+				logger.info("I-> streamID: {} \treqID: {}\t data: {}", req.getStreamId(), req.getRequestId(), req.toString());
 			} else {
 				logger.info("Unhandled message event UP: {}", me.toString());
 			}
@@ -235,12 +235,12 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					mode = 1;
 				else
 					mode = 0; // not correct
-				fileCounter.compareAndSet(9999999,0);
+				fileCounter.compareAndSet(9999999, 0);
 				FileStatistics fs = new FileStatistics(fileCounter.intValue());
 				fs.filename = or.getPath();
 				fs.mode = mode;
 				fs.filesize = OR.getFileStatus().getSize();
-				logger.warn("FILE OPEN RESPONSE    connId: {}   readonly: {}   path :" + fs.filename + "  fileCounter: " + fs.fileCounter, connId, mode);
+				logger.warn("FILE OPEN RESPONSE    connId: {}   readonly: {}   path :{},  fileCounter: {}", connId, mode, fs.filename, fs.fileCounter);
 				collector.cmap.get(connId).addFile(OR.getFileHandle(), fs);
 			}
 
