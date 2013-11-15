@@ -28,7 +28,7 @@ public class ConnectionInfo {
 	}
 
 	public void ConnectionClose() {
-		logger.info("CLOSED CONNECTION: " + connectionID + "   duration: " + (System.currentTimeMillis() - duration) / 1000);
+		logger.info("CLOSED CONNECTION: {}   duration: {}", connectionID, (System.currentTimeMillis() - duration) / 1000);
 		this.disconnected = true;
 	}
 
@@ -38,7 +38,7 @@ public class ConnectionInfo {
 
 	public void logUserResponse(String host, int port) {
 		ui.setHostPort(host, port);
-		logger.info("LOGGED " + connectionID + " " + ui.getInfo());
+		logger.info("LOGGED {} {}", connectionID, ui.getInfo());
 	}
 
 	public void addFile(Integer handle, FileStatistics fi) {

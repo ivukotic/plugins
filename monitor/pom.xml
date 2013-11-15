@@ -4,7 +4,7 @@
 
   <groupId>edu.uchicago</groupId>
   <artifactId>monitor</artifactId>
-  <version>5.0.0</version>
+  <version>5.0.1</version>
   <packaging>jar</packaging>
 
   <name>ATLAS dCache xrootd monitor</name>
@@ -19,7 +19,6 @@
 
   <properties>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <version.xrootd4j>1.1.0</version.xrootd4j>
   </properties>
 
   <repositories>
@@ -39,12 +38,12 @@
     <dependency>
         <groupId>org.dcache</groupId>
         <artifactId>xrootd4j</artifactId>
-        <version>${version.xrootd4j}</version>
+        <version>1.2.2</version>
     </dependency>
     <dependency>
     	<groupId>ch.qos.logback</groupId>
     	<artifactId>logback-classic</artifactId>
-    	<version>1.0.9</version>
+    	<version>1.0.12</version>
     </dependency>
   </dependencies>
 

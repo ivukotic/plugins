@@ -156,7 +156,7 @@ public class Collector {
 
 
 	public void closeFileEvent(int connectionId, int fh) {
-		logger.debug(">>>Closed " + connectionId + "  file handle: " + fh);
+		logger.debug(">>>Closed {}  file handle:{}", connectionId, fh);
 		// if detailed monitoring is ON collector will remove it from map
 		if (ca.reportDetailed == false)
 			cmap.get(connectionId).removeFile(fh);
@@ -171,7 +171,7 @@ public class Collector {
 	public void disconnectedEvent(int connectionId) {
 		successfulConnections.getAndIncrement();
 		try {
-			logger.info("DISCONNECTED " + connectionId);
+			logger.info("DISCONNECTED {} ", connectionId);
 			cmap.get(connectionId).ConnectionClose();
 			if (ca.reportDetailed == false)
 				cmap.remove(connectionId);
@@ -189,13 +189,13 @@ public class Collector {
 			ci.logUserResponse(((InetSocketAddress) remoteAddress).getHostName(), ((InetSocketAddress) remoteAddress).getPort());
 			SendMapMessage((byte) 117, connectionId, ci.ui.getFullInfo());
 		} else {
-			logger.error("Could not map connection " + connectionId + "to user.");
+			logger.error("Could not map connection {} to user.", connectionId);
 		}
 	}
 
 	// type - 117:u 100:d 105:i
 	public void SendMapMessage(byte mtype, Integer dictid, String content) {
-		logger.debug("sending map message: " + dictid.toString() + " -> " + content);
+		logger.debug("sending map message: {} -> {}", dictid.toString(), content);
 
 		try {
 			pseq += 1;
@@ -213,7 +213,7 @@ public class Collector {
 			mess.put(db);
 
 		} catch (Exception e) {
-			logger.error("unrecognized exception: " + e.getMessage());
+			logger.error("unrecognized exception: {} ", e.getMessage());
 		}
 	}
 
@@ -278,13 +278,13 @@ public class Collector {
 						if (future.isSuccess())
 							logger.debug("summary stream IO completed. success!");
 						else {
-							logger.error("summary stream IO completed. did not send info:" + future.getCause());
+							logger.error("summary stream IO completed. did not send info:{}", future.getCause());
 						}
 					}
 				});
 
 			} catch (Exception e) {
-				logger.error("unrecognized exception in sending summary stream: " + e.getMessage());
+				logger.error("unrecognized exception in sending summary stream:{} ", e.getMessage());
 			}
 		}
 	}
@@ -380,7 +380,7 @@ public class Collector {
 							plen += len;
 							db.writeShort(len); // size
 							db.writeInt(fs.fileCounter);
-							logger.debug("FOpened: " + fs.fileCounter);
+							logger.debug("FOpened: {}", fs.fileCounter);
 							db.writeLong(fs.filesize); // filesize at open.
 							if (true) { // check if Filenames should be
 										// reported.
@@ -399,7 +399,7 @@ public class Collector {
 						db.writeByte((byte) 3); // 3 means isXfr
 						db.writeByte((byte) 0); // no meaning
 						db.writeShort(32); // 3*longlong + this header itself
-						logger.debug("FTransfer: " + fs.fileCounter);
+						logger.debug("FTransfer: {}", fs.fileCounter);
 						db.writeInt(fs.fileCounter);
 						db.writeLong(fs.bytesRead.get());
 						db.writeLong(fs.bytesVectorRead.get());
@@ -432,7 +432,7 @@ public class Collector {
 							}
 
 							db.writeShort(packlength); // size of this header
-							logger.debug("FClosed: " + fs.fileCounter);
+							logger.debug("FClosed: {}", fs.fileCounter);
 							db.writeInt(fs.fileCounter);
 
 							if (closedetails != 1) {
@@ -487,7 +487,7 @@ public class Collector {
 					// this also closes connection if longer than 5 days
 					if (ent.getValue().disconnected == true || (ct - ent.getValue().duration) > 432000000) {
 
-						logger.debug("ReportConnClose: " + ent.getKey());
+						logger.debug("ReportConnClose: {}", ent.getKey());
 						db.writeByte((byte) 4); // 4 - means isDisc
 						db.writeByte((byte) 0); // no meaning
 						db.writeShort(8); // size
@@ -498,14 +498,14 @@ public class Collector {
 					}
 				}
 
-				logger.debug("message length: " + plen + "\t buffer length:" + db.writableBytes());
+				logger.debug("message length: {} \t buffer length: {}",plen, db.writableBytes());
 				db.setShort(2, plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
 				mess.put(db);
 
 			} catch (Exception e) {
-				logger.error("unrecognized exception in sending f-stream: " + e.getMessage());
+				logger.error("unrecognized exception in sending f-stream:{} ",e.getMessage());
 			}
 		}
 

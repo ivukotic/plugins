@@ -1,5 +1,7 @@
 package edu.uchicago.monitor;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 import org.dcache.xrootd.protocol.messages.AbstractResponseMessage;
 import org.dcache.xrootd.protocol.messages.CloseRequest;
 import org.dcache.xrootd.protocol.messages.GenericReadRequestMessage.EmbeddedReadRequest;
@@ -28,7 +30,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
 	private int connId;
-	private static int fileCounter = 0;
+	private static AtomicInteger fileCounter  = new AtomicInteger();;
 
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
@@ -36,7 +38,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	@Override
 	public void handleUpstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
-		logger.debug("UP mess:" + e.toString());
+		logger.debug("UP mess: {}", e.toString());
 
 		if (e instanceof MessageEvent) {
 			// logger.info("MessageEvent UP");
@@ -52,7 +54,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					fs.reads.getAndIncrement();
 					collector.totBytesRead.getAndAdd(rr.bytesToRead());
 				} else {
-					logger.warn("can't get connId " + connId + " in fmap. should not happen except in case of recent restart.");
+					logger.warn("can't get connId {} in fmap. should not happen except in case of recent restart.", connId);
 				}
 			}
 
@@ -77,7 +79,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				int protocol = lr.getClientProtocolVersion();
 				String user = lr.getUserName();
 				int userpid = lr.getPID();
-				logger.info("LOGIN REQUEST   " + connId + "    client username: " + user + "   protocol: " + protocol + "     client PID: " + userpid);
+				logger.info("LOGIN REQUEST   {}   client username: {}    protocol: " + protocol + "     client PID: " + userpid, connId, user);
 				collector.cmap.get(connId).logUserRequest(user, userpid);
 			}
 
@@ -110,7 +112,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			else if (message instanceof CloseRequest) {
 				CloseRequest cr = (CloseRequest) message;
-				logger.info("FILE CLOSE REQUEST ------- connId:     " + connId);
+				logger.info("FILE CLOSE REQUEST ------- connId:    {} ", connId);
 				collector.cmap.get(connId).getFile(cr.getFileHandle()).close();
 				collector.closeFileEvent(connId, connId);
 			}
@@ -130,9 +132,9 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// req.toString());
 			} else if (message instanceof XrootdRequest) {
 				XrootdRequest req = (XrootdRequest) message;
-				logger.info("I-> streamID: " + req.getStreamId() + "\treqID: " + req.getRequestId() + "\t data:" + req.toString());
+				logger.info("I-> streamID: {} \treqID: {}\t data:" + req.toString(), req.getStreamId(), req.getRequestId());
 			} else {
-				logger.info("Unhandled message event UP: " + me.toString());
+				logger.info("Unhandled message event UP: {}", me.toString());
 			}
 		}
 
@@ -147,7 +149,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			if (se.getState() == ChannelState.OPEN && se.getValue() != null) {
 				if (se.getValue() == Boolean.TRUE) {
-					logger.info("CHANNEL OPEN EVENT " + connId);
+					logger.info("CHANNEL OPEN EVENT {}", connId);
 					collector.addConnectionAttempt();
 					logger.debug("done.");
 				} else {
@@ -167,7 +169,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				if (se.getValue() == null) {
 					collector.disconnectedEvent(connId);
 				} else {
-					logger.info("CHANNEL CONNECT EVENT   connId: " + connId + "    value:" + se.getValue());
+					logger.info("CHANNEL CONNECT EVENT   connId: {}    value:{}", connId, se.getValue());
 					collector.connectedEvent(connId);
 				}
 			}
@@ -178,7 +180,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else {
-				logger.info("Unhandled ChannelState Event UP : " + se.getState().toString() + "\t" + se.toString());
+				logger.info("Unhandled ChannelState Event UP : {} \t {}", se.getState().toString(), se.toString());
 			}
 
 		}
@@ -192,7 +194,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		else if (e instanceof ExceptionEvent) {
 			logger.info("ExceptionEvent UP");
 			ExceptionEvent dee = (ExceptionEvent) e;
-			logger.error("eXception thrown message " + dee.toString());
+			logger.error("eXception thrown message {}", dee.toString());
 		}
 
 		else { // completely impossible
@@ -233,12 +235,12 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					mode = 1;
 				else
 					mode = 0; // not correct
-				fileCounter = (fileCounter + 1) % 9999999;
-				FileStatistics fs = new FileStatistics(fileCounter);
+				fileCounter.compareAndSet(9999999,0);
+				FileStatistics fs = new FileStatistics(fileCounter.intValue());
 				fs.filename = or.getPath();
 				fs.mode = mode;
 				fs.filesize = OR.getFileStatus().getSize();
-				logger.warn("FILE OPEN RESPONSE    connId: " + connId + "   readonly: " + mode + "   path :" + fs.filename + "  fileCounter: " + fs.fileCounter);
+				logger.warn("FILE OPEN RESPONSE    connId: {}   readonly: {}   path :" + fs.filename + "  fileCounter: " + fs.fileCounter, connId, mode);
 				collector.cmap.get(connId).addFile(OR.getFileHandle(), fs);
 			}
 
@@ -246,18 +248,18 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				AbstractResponseMessage ARM = (AbstractResponseMessage) message;
 				XrootdRequest req = ARM.getRequest();
 				if (req instanceof LoginRequest) {
-					logger.debug("LOGGIN RESPONSE connId:     " + connId + "    host ip:    " + e.getChannel().getRemoteAddress());
+					logger.debug("LOGGIN RESPONSE connId:     {}    host ip:    {}", connId, e.getChannel().getRemoteAddress());
 					collector.loggedEvent(connId, e.getChannel().getRemoteAddress());
 				}
 			} else {
-				logger.warn("Unhandled MessageEvent DOWN: " + me.toString());
+				logger.warn("Unhandled MessageEvent DOWN: {}", me.toString());
 			}
 
 		}
 
 		else if (e instanceof ChannelStateEvent) {
 			ChannelStateEvent se = (ChannelStateEvent) e;
-			logger.info("Channel State Event DOWN : " + se.getState().toString() + "\t" + se.getValue().toString());
+			logger.info("Channel State Event DOWN : {} \t {}", se.getState().toString(), se.getValue().toString());
 		}
 
 		else if (e instanceof WriteCompletionEvent) {
@@ -270,7 +272,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		else if (e instanceof ExceptionEvent) {
 			logger.info("ExceptionEvent DOWN");
 			ExceptionEvent dee = (ExceptionEvent) e;
-			logger.error("eXception thrown message " + dee.toString());
+			logger.error("eXception thrown message {}", dee.toString());
 		}
 
 		else { // completely impossible
