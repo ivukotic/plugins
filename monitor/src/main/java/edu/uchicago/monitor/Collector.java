@@ -58,7 +58,7 @@ public class Collector {
 
 	private DatagramChannelFactory f;
 	private ConnectionlessBootstrap cbsSummary;
-	public final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
+	private final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
 	private AtomicInteger successfulConnections = new AtomicInteger();
@@ -78,6 +78,10 @@ public class Collector {
 		init();
 	}
 
+	public ConnectionInfo getCI(Integer connid){
+		return cmap.get(connid);
+	} 
+	
 	private void init() {
 
 		// if not defined will try to get it using getHostName.
@@ -161,9 +165,13 @@ public class Collector {
 	}
 
 	public void connectedEvent(int connectionId) {
+		maxConnectionsCheck();
+		cmap.put(connectionId, new ConnectionInfo(connectionId, DetailedLocalSendingPort));
+	}
+	
+	private synchronized void maxConnectionsCheck(){
 		if (cmap.size() > maxConnections.get())
 			maxConnections.set(cmap.size());
-		cmap.put(connectionId, new ConnectionInfo(connectionId, DetailedLocalSendingPort));
 	}
 
 	public void disconnectedEvent(int connectionId) {

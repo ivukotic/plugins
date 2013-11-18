@@ -5,10 +5,10 @@
 
 	<groupId>edu.uchicago.xrootd4j</groupId>
 	<artifactId>atlas-ns-mapping</artifactId>
-	<version>4.0.0</version>
+	<version>4.0.6</version>
 	<packaging>jar</packaging>
 
-	<name>My xrootd4j authorization and mapping plugin</name>
+	<name>ATLAS xrootd4j authorization and mapping plugin</name>
 
 	<licenses>
 		<license>
@@ -20,7 +20,6 @@
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<version.xrootd4j>1.2-SNAPSHOT</version.xrootd4j>
 	</properties>
 
 	<repositories>
@@ -39,11 +38,6 @@
 		</dependency>
 		<dependency>
 			<groupId>org.dcache</groupId>
-			<artifactId>xrootd4j</artifactId>
-			<version>${version.xrootd4j}</version>
-		</dependency>
-		<dependency>
-			<groupId>org.dcache</groupId>
 			<artifactId>cog-jglobus</artifactId>
 			<version>1.8.0-1</version>
 		</dependency>
@@ -58,9 +52,14 @@
 			<version>20090211</version>
 		</dependency>
 		<dependency>
-			<groupId>log4j</groupId>
-			<artifactId>log4j</artifactId>
-			<version>1.2.14</version>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>1.0.12</version>
+		</dependency>
+		<dependency>
+			<groupId>org.dcache</groupId>
+			<artifactId>xrootd4j</artifactId>
+			<version>1.2.3</version>
 		</dependency>
 	</dependencies>
 

@@ -20,31 +20,30 @@ import nl.uva.vlet.glite.lfc.LFCServer;
 import nl.uva.vlet.glite.lfc.internal.FileDesc;
 import nl.uva.vlet.glite.lfc.internal.ReplicaDesc;
 
+import org.dcache.xrootd.core.XrootdException;
 import org.dcache.xrootd.plugins.AuthorizationHandler;
 import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
 import org.globus.gsi.GlobusCredential;
 import org.globus.gsi.GlobusCredentialException;
-
-import org.apache.log4j.Logger;
-import org.apache.log4j.PropertyConfigurator;
+import org.slf4j.LoggerFactory;
+import org.slf4j.Logger;
 
 public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
-	final private static Logger log = Logger.getLogger(AtlasAuthorizationHandler.class);
+	final static Logger log = LoggerFactory.getLogger(AtlasAuthorizationHandler.class);
+
 	public URI lfcUri = null;
 
 	private LFCConfig config = null;
 	private String LFC_HOST = "";
 	private String SRM_HOST = "";
 
-	String proxyFile = null;
-	
-	private RucioN2N rucio=null;
-	
-	public AtlasAuthorizationHandler(Properties properties) throws IllegalArgumentException, MissingResourceException {
+	private static RucioN2N rucio = null;
 
-		PropertyConfigurator.configure(AtlasAuthorizationHandler.class.getClassLoader().getResource("log4j.properties"));
-		
+	public AtlasAuthorizationHandler(RucioN2N rc, Properties properties) throws IllegalArgumentException, MissingResourceException {
+
+		rucio = rc;
+
 		LFC_HOST = properties.getProperty("lfc_host");
 		SRM_HOST = properties.getProperty("srm_host");
 
@@ -64,37 +63,24 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 		try {
 			config = new LFCConfig();
 			log.info("trying to get proxy...");
-			 config.globusCredential = getValidProxy();
+			config.globusCredential = getValidProxy();
 		} catch (Exception e) {
 			log.info("*** Can't get valid Proxy. We hope that your LFC_HOST allows for non-authenticated read-only access and you have gLite.");
 			log.debug(e.getMessage());
 			config = null;
 		}
-		
-		rucio=new RucioN2N(properties);
-		
+
 	}
 
 	public GlobusCredential getValidProxy() {
 		GlobusCredential cred = null;
 
-		// custom proxy
-		if (proxyFile != null) {
-			log.info("Using proxy from:" + proxyFile);
-			try {
-				cred = new GlobusCredential(proxyFile);
-			} catch (GlobusCredentialException e) {
-				log.error("*** Error: problem when getting credential from file: " + proxyFile+"\n"+e.getMessage());
-				throw new MissingResourceException("*** Error: problem when getting credential from file: " + proxyFile, "GlobusCredential", "");
-			}
-		} else {
-			log.info("Using default proxy file.");
-			try {
-				cred = GlobusCredential.getDefaultCredential();
-			} catch (GlobusCredentialException e) {
-				log.warn("*** Can't get default proxy. "+e.getMessage());
-				throw new MissingResourceException("*** Can't get default proxy.", "GlobusCredential", "");
-			}
+		log.info("Using default proxy file.");
+		try {
+			cred = GlobusCredential.getDefaultCredential();
+		} catch (GlobusCredentialException e) {
+			log.warn("*** Can't get default proxy. " + e.getMessage());
+			throw new MissingResourceException("*** Can't get default proxy.", "GlobusCredential", "");
 		}
 
 		if (cred == null) {
@@ -114,24 +100,32 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 	@Override
 	public String authorize(Subject subject, InetSocketAddress localAddress, InetSocketAddress remoteAddress, String path, Map<String, String> opaque,
-			int request, FilePerm mode) throws SecurityException, GeneralSecurityException {
+			int request, FilePerm mode) throws SecurityException, GeneralSecurityException, XrootdException {
 
 		log.info("GOT to translate: " + path);
 
-		if (path.startsWith("pnfs/")) {
+		if (path.startsWith("pnfs/") || path.startsWith("/pnfs/") ) {
 			return path;
 		}
 
 		String LFN = path;
 		if (!LFN.startsWith("/atlas/")) {
 			log.error("*** Error: LFN must start with /atlas/. ");
-			return "";
+			throw new XrootdException(request, "*** Error: LFN must start with /atlas/. ");
 		}
 
-		if (!LFN.startsWith("/atlas/rucio/")){
-			return rucio.translate(LFN);
+		if (LFN.startsWith("/atlas/rucio/")) {
+			String pfn = rucio.translate(LFN);
+			if (pfn == null) {
+				log.info("rucio name not found.");
+				pfn = "";
+				throw new XrootdException(request, "rucio name not found.");
+			} else {
+				log.info("rucio translated name: " + pfn);
+				return pfn;
+			}
 		}
-		
+
 		String sLFN = "lfn://grid" + LFN;
 		LFN = "lfn://" + LFC_HOST + "//grid" + LFN;
 
@@ -148,7 +142,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			} catch (URISyntaxException e) {
 				log.error("*** Error: Invalid URI:" + LFN);
 				log.error(e.getMessage());
-				return "";
+				throw new XrootdException(request, "*** Error: Invalid URI:" + LFN + "\n" + e.getMessage());
 			}
 
 			LFCServer lfcServer;
@@ -158,7 +152,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			} catch (Exception e) {
 				log.error("*** Could not connect to LFC. Giving up.");
 				log.error(e.getMessage());
-				return "";
+				throw new XrootdException(request, "*** Could not connect to LFC. Giving up." + e.getMessage());
 			}
 
 			String guid = "";
@@ -168,7 +162,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				guid = LFN.substring(gu + 5);
 				if (guid.length() != 36) {
 					log.error("*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
-					return "";
+					throw new XrootdException(request, "*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
 				}
 			} else {
 				FileDesc entry = new FileDesc();
@@ -191,7 +185,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 				if (!entry.isFile()) {
 					log.error("*** Error: No such file or not a file.");
-					return "";
+					throw new XrootdException(request, "*** Error: No such file or not a file.");
 				}
 				guid = entry.getGuid();
 			}
@@ -202,7 +196,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				ArrayList<ReplicaDesc> replicas = lfcServer.getReplicas(guid);
 				if (replicas.isEmpty()) {
 					log.info("*** Error: No replica exists in this LFC.");
-					return "";
+					throw new XrootdException(request, "*** Error: No replica exists in this LFC.");
 				} else {
 					String PFN = "";
 					log.debug("found " + replicas.size() + " replicas.");
@@ -221,12 +215,12 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 						}
 					}
 					log.error("*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
-					return "";
+					throw new XrootdException(request, "*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
 				}
 			} catch (Exception e) {
 				log.error("*** Error: Can't get list of Replicas.");
 				log.error(e.getMessage());
-				return "";
+				throw new XrootdException(request, "*** Error: Can't get list of Replicas.\n" + e.getMessage());
 			}
 
 		}
@@ -271,7 +265,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		}
 
-		return "";
+		throw new XrootdException(request, "*** Error: File not Found.");
 	}
 
 	public FileDesc ifInputIsContainerDS(String path, LFCServer lfcServer) {

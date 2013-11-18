@@ -7,36 +7,35 @@ import java.util.Set;
 
 import org.dcache.xrootd.plugins.AuthorizationFactory;
 
+public class AtlasAuthorizationFactory implements AuthorizationFactory {
+	final static String NAME = "atlas-name-to-name-plugin";
+	final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
 
-public class AtlasAuthorizationFactory implements AuthorizationFactory
-{
-    final static String NAME = "atlas-name-to-name-plugin";
-    final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
-    
-    String proxyFile = null;
-    private Properties properties=null;
-    
-    public AtlasAuthorizationFactory(Properties properties){
-    	this.properties=properties;
-    }
+	private static RucioN2N rucio = null;
 
-    static boolean hasName(String name){
-        return ALTERNATIVE_NAMES.contains(name);
-    }
+	private static AtlasAuthorizationHandler AAH = null;
 
-    @Override
-    public String getName(){
-        return NAME;
-    }
+	public AtlasAuthorizationFactory(Properties properties) {
+		rucio = new RucioN2N(properties);
+		AAH = new AtlasAuthorizationHandler(rucio, properties);
+	}
 
-    @Override
-    public String getDescription(){
-        return "ATLAS xrootd name-to-name plugin";
-    }
+	static boolean hasName(String name) {
+		return ALTERNATIVE_NAMES.contains(name);
+	}
 
-    @Override
-    public AtlasAuthorizationHandler createHandler()
-    {
-        return new AtlasAuthorizationHandler(properties);
-    }
+	@Override
+	public String getName() {
+		return NAME;
+	}
+
+	@Override
+	public String getDescription() {
+		return "ATLAS xrootd name-to-name plugin";
+	}
+
+	@Override
+	public AtlasAuthorizationHandler createHandler() {
+		return AAH;
+	}
 }

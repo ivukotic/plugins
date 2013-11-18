@@ -48,7 +48,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 			if (message instanceof ReadRequest) {
 				ReadRequest rr = (ReadRequest) message;
-				FileStatistics fs = collector.cmap.get(connId).getFile(rr.getFileHandle());
+				FileStatistics fs = collector.getCI(connId).getFile(rr.getFileHandle());
 				if (fs != null) {
 					fs.bytesRead.getAndAdd(rr.bytesToRead());
 					fs.reads.getAndIncrement();
@@ -64,7 +64,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				EmbeddedReadRequest[] err = rr.getReadRequestList();
 				long totVread = 0;
 				for (int i = 0; i < rr.NumberOfReads(); i++) {
-					FileStatistics fs = collector.cmap.get(connId).getFile(err[i].getFileHandle());
+					FileStatistics fs = collector.getCI(connId).getFile(err[i].getFileHandle());
 					fs.vectorReads.getAndIncrement();
 					fs.bytesVectorRead.getAndAdd(err[i].BytesToRead());
 					totVread += err[i].BytesToRead();
@@ -80,7 +80,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				String user = lr.getUserName();
 				int userpid = lr.getPID();
 				logger.info("LOGIN REQUEST   {}   client username: {}    protocol: {}     client PID: {}", connId, user, protocol, userpid);
-				collector.cmap.get(connId).logUserRequest(user, userpid);
+				collector.getCI(connId).logUserRequest(user, userpid);
 			}
 
 			// from OpenRequest we get:
@@ -107,19 +107,19 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// "   readonly: " + mode + "   path :" + fs.filename);
 				// fs.mode = mode;
 				// // collector.fmap.put(-connId, fs);
-				// collector.cmap.get(connId).addFile(fs);
+				// collector.getCI(connId).addFile(fs);
 			}
 
 			else if (message instanceof CloseRequest) {
 				CloseRequest cr = (CloseRequest) message;
 				logger.info("FILE CLOSE REQUEST ------- connId:    {} ", connId);
-				collector.cmap.get(connId).getFile(cr.getFileHandle()).close();
+				collector.getCI(connId).getFile(cr.getFileHandle()).close();
 				collector.closeFileEvent(connId, connId);
 			}
 
 			else if (message instanceof WriteRequest) {
 				WriteRequest wr = (WriteRequest) message;
-				FileStatistics fs = collector.cmap.get(connId).getFile(wr.getFileHandle());
+				FileStatistics fs = collector.getCI(connId).getFile(wr.getFileHandle());
 				if (fs != null) {
 					fs.bytesWritten.getAndAdd(wr.getDataLength());
 					fs.writes.getAndIncrement();
@@ -241,7 +241,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				fs.mode = mode;
 				fs.filesize = OR.getFileStatus().getSize();
 				logger.warn("FILE OPEN RESPONSE    connId: {}   readonly: {}   path :{},  fileCounter: {}", connId, mode, fs.filename, fs.fileCounter);
-				collector.cmap.get(connId).addFile(OR.getFileHandle(), fs);
+				collector.getCI(connId).addFile(OR.getFileHandle(), fs);
 			}
 
 			else if (message instanceof AbstractResponseMessage) {

@@ -1,7 +1,8 @@
 package edu.uchicago.monitor;
 
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -11,7 +12,7 @@ public class ConnectionInfo {
 	public UserInfo ui;
 	public long duration;
 	private int serverPort;
-	public HashMap<Integer, FileStatistics> allFiles;
+	public ConcurrentHashMap<Integer, FileStatistics> allFiles;
 
 	public Boolean disconnected; // initially this is 0. on disconnect will be
 									// changed to 1 and upon sending f-stream
@@ -22,7 +23,7 @@ public class ConnectionInfo {
 		this.connectionID = connID;
 		this.serverPort = DetailedLocalSendingPort;
 		duration = System.currentTimeMillis();
-		allFiles = new HashMap<Integer, FileStatistics>();
+		allFiles = new ConcurrentHashMap<Integer, FileStatistics>();
 	}
 
 	public void ConnectionClose() {
@@ -48,7 +49,7 @@ public class ConnectionInfo {
 		return allFiles.get(handle);
 	}
 
-	public void removeFile(Integer handle) {
+	public synchronized void removeFile(Integer handle) {
 		allFiles.remove(handle);
 	}
 
