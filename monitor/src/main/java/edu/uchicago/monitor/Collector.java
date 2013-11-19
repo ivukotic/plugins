@@ -70,7 +70,9 @@ public class Collector {
 	private final UDPsender sender;
 	private UDPmessage mess;
 	private int DetailedLocalSendingPort;
-
+	private Timer tDetailed; 
+	private float factor;
+	
 	Collector(Properties properties) {
 		this.properties = properties;
 		sender = new UDPsender();
@@ -146,13 +148,22 @@ public class Collector {
 		Timer timer = new Timer();
 		// this is used for printing out state and sending "=" stream
 		timer.schedule(new currentStatus(), 0, 5 * 60 * 1000);
-
-		Timer tDetailed = new Timer();
-		if (ca.reportDetailed == true)
-			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, ca.detailed.get(0).delay * 1000);
-
+		
+		factor=1;
+		createReportingThreads();
 	}
 
+	// this is rescheduling sending of information in case UDP packets would grow too large
+	private void createReportingThreads( ){
+		if (tDetailed!=null){
+			logger.warn("removing detailed reporting timer");
+			tDetailed.cancel();
+		}
+		tDetailed = new Timer();
+		if (ca.reportDetailed == true)
+			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, (long) (ca.detailed.get(0).delay * 1000 * factor) );
+	}
+	
 	public void addConnectionAttempt() {
 		connectionAttempts.getAndIncrement();
 	}
@@ -279,13 +290,14 @@ public class Collector {
 
 				ChannelFuture f = c.write(xmlmessage, destination);
 				f.addListener(new ChannelFutureListener() {
-					public void operationComplete(ChannelFuture future) {
+					public void operationComplete(ChannelFuture future) throws Exception {
 						if (future.isSuccess())
 							logger.debug("summary stream IO completed. success!");
 						else {
 							logger.error("summary stream IO completed. did not send info:{}", future.getCause());
 						}
 					}
+					
 				});
 
 			} catch (Exception e) {
@@ -397,6 +409,7 @@ public class Collector {
 							subpackets += 1;
 						}
 
+						// adding TRANSFER levels
 						db.writeByte((byte) 3); // 3 means isXfr
 						db.writeByte((byte) 0); // no meaning
 						db.writeShort(32); // 3*longlong + this header itself
@@ -502,7 +515,18 @@ public class Collector {
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
 				mess.put(db);
-
+				
+				// if message is long, half the reporting time
+				if (plen>32000 && factor>0.1) {
+					factor=factor/2;
+					createReportingThreads();
+				}else{
+					// if not prolong it up to 1.
+					if(factor<1){
+						factor=factor*2;
+						createReportingThreads();
+					}
+				}
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending f-stream:{} ", e.getMessage());
 			}

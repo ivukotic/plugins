@@ -58,7 +58,7 @@ public class UDPsender extends Thread {
 		while (true) {
 			ChannelFuture f = c.write(message.get(), destination);
 			f.addListener(new ChannelFutureListener() {
-				public void operationComplete(ChannelFuture future) {
+				public void operationComplete(ChannelFuture future) throws Exception {
 					if (future.isSuccess())
 						logger.info("detailed stream IO completed. success!");
 					else {

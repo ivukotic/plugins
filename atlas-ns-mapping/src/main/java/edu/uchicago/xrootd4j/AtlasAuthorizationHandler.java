@@ -22,6 +22,7 @@ import nl.uva.vlet.glite.lfc.internal.ReplicaDesc;
 
 import org.dcache.xrootd.core.XrootdException;
 import org.dcache.xrootd.plugins.AuthorizationHandler;
+import org.dcache.xrootd.protocol.XrootdProtocol;
 import org.dcache.xrootd.protocol.XrootdProtocol.FilePerm;
 import org.globus.gsi.GlobusCredential;
 import org.globus.gsi.GlobusCredentialException;
@@ -111,7 +112,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 		String LFN = path;
 		if (!LFN.startsWith("/atlas/")) {
 			log.error("*** Error: LFN must start with /atlas/. ");
-			throw new XrootdException(request, "*** Error: LFN must start with /atlas/. ");
+			throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: LFN must start with /atlas/. ");
 		}
 
 		if (LFN.startsWith("/atlas/rucio/")) {
@@ -119,7 +120,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			if (pfn == null) {
 				log.info("rucio name not found.");
 				pfn = "";
-				throw new XrootdException(request, "rucio name not found.");
+				throw new XrootdException(XrootdProtocol.kXR_NotFound, "rucio name not found.");
 			} else {
 				log.info("rucio translated name: " + pfn);
 				return pfn;
@@ -142,7 +143,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			} catch (URISyntaxException e) {
 				log.error("*** Error: Invalid URI:" + LFN);
 				log.error(e.getMessage());
-				throw new XrootdException(request, "*** Error: Invalid URI:" + LFN + "\n" + e.getMessage());
+				throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: Invalid URI:" + LFN + "\n" + e.getMessage());
 			}
 
 			LFCServer lfcServer;
@@ -152,7 +153,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 			} catch (Exception e) {
 				log.error("*** Could not connect to LFC. Giving up.");
 				log.error(e.getMessage());
-				throw new XrootdException(request, "*** Could not connect to LFC. Giving up." + e.getMessage());
+				throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Could not connect to LFC. Giving up." + e.getMessage());
 			}
 
 			String guid = "";
@@ -162,7 +163,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				guid = LFN.substring(gu + 5);
 				if (guid.length() != 36) {
 					log.error("*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
-					throw new XrootdException(request, "*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
+					throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: GUID has to have 36 characters. 32 hex numbers and 4 minuses");
 				}
 			} else {
 				FileDesc entry = new FileDesc();
@@ -185,7 +186,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 				if (!entry.isFile()) {
 					log.error("*** Error: No such file or not a file.");
-					throw new XrootdException(request, "*** Error: No such file or not a file.");
+					throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: No such file or not a file.");
 				}
 				guid = entry.getGuid();
 			}
@@ -196,7 +197,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 				ArrayList<ReplicaDesc> replicas = lfcServer.getReplicas(guid);
 				if (replicas.isEmpty()) {
 					log.info("*** Error: No replica exists in this LFC.");
-					throw new XrootdException(request, "*** Error: No replica exists in this LFC.");
+					throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: No replica exists in this LFC.");
 				} else {
 					String PFN = "";
 					log.debug("found " + replicas.size() + " replicas.");
@@ -215,12 +216,12 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 						}
 					}
 					log.error("*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
-					throw new XrootdException(request, "*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
+					throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: No replica coresponding to this SRM_HOST exists in this LFC.");
 				}
 			} catch (Exception e) {
 				log.error("*** Error: Can't get list of Replicas.");
 				log.error(e.getMessage());
-				throw new XrootdException(request, "*** Error: Can't get list of Replicas.\n" + e.getMessage());
+				throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: Can't get list of Replicas.\n" + e.getMessage());
 			}
 
 		}
@@ -265,7 +266,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 		}
 
-		throw new XrootdException(request, "*** Error: File not Found.");
+		throw new XrootdException(XrootdProtocol.kXR_NotFound, "*** Error: File not Found.");
 	}
 
 	public FileDesc ifInputIsContainerDS(String path, LFCServer lfcServer) {

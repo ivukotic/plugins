@@ -11,9 +11,9 @@ public class AtlasAuthorizationFactory implements AuthorizationFactory {
 	final static String NAME = "atlas-name-to-name-plugin";
 	final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
 
-	private static RucioN2N rucio = null;
+	private final RucioN2N rucio;
 
-	private static AtlasAuthorizationHandler AAH = null;
+	private final AtlasAuthorizationHandler AAH;
 
 	public AtlasAuthorizationFactory(Properties properties) {
 		rucio = new RucioN2N(properties);

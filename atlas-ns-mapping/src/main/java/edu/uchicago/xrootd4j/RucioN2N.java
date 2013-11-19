@@ -29,8 +29,7 @@ public class RucioN2N {
 
 	final static Logger log = LoggerFactory.getLogger(RucioN2N.class);
 
-	private MessageDigest md;
-	private final Map<String, Integer> cmap = new ConcurrentHashMap<String, Integer>();
+	private final Map<String, AtomicInteger> cmap = new ConcurrentHashMap<String, AtomicInteger>();
 	private int nSpaceTokens;
 	private AtomicInteger filesFound = new AtomicInteger();
 	private AtomicInteger filesLookedFor = new AtomicInteger();
@@ -47,7 +46,7 @@ public class RucioN2N {
 			String[] sts = overwriteSE.split(",");
 
 			for (String s : sts) {
-				cmap.put(s, 0);
+				cmap.put(s, new AtomicInteger());
 			}
 
 			if (cmap.isEmpty()) {
@@ -81,7 +80,7 @@ public class RucioN2N {
 						log.debug("space_token: " + space_token);
 						String st = space_token.getString(2);
 						log.info("adding space token: " + st);
-						cmap.put(st, 0);
+						cmap.put(st, new AtomicInteger());
 					}
 				}
 			}
@@ -107,7 +106,7 @@ public class RucioN2N {
 						for (int apa = 0; apa < aprotocols.length(); apa++) {
 							String st = aprotocols.getString(apa);
 							log.info("adding space token: " + st);
-							cmap.put(st, 0);
+							cmap.put(st, new AtomicInteger());
 						}
 					}
 				}
@@ -125,13 +124,6 @@ public class RucioN2N {
 
 		// this won't be changed
 		nSpaceTokens = cmap.size();
-
-		try {
-			md = MessageDigest.getInstance("MD5");
-		} catch (NoSuchAlgorithmException e) {
-			log.error("can't get MD5 algorithm.");
-			e.printStackTrace();
-		}
 
 		log.info("Rucio setup properly.");
 	}
@@ -177,7 +169,16 @@ public class RucioN2N {
 
 		scope_fileName = scope + ":" + fileName;
 		log.debug("scope+filename: " + scope_fileName);
-
+		
+		MessageDigest md;
+		try {
+			md = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			log.error("can't get MD5 algorithm.");
+			e.printStackTrace();
+			return null;
+		}
+		
 		String hashtext = "";
 		try {
 			scope_fileName = scope_fileName.replaceAll("/", ".");
@@ -205,10 +206,10 @@ public class RucioN2N {
 
 		for (int i = 0; i < nSpaceTokens; i++) {
 			String maxKey = "";
-			Integer maxValue = -1;
-			for (Map.Entry<String, Integer> entry : cmap.entrySet()) {
-				if (entry.getValue() >= maxValue && !found.contains(entry.getKey())) {
-					maxValue = entry.getValue();
+			int maxValue = -1;
+			for (Map.Entry<String, AtomicInteger> entry : cmap.entrySet()) {
+				if (entry.getValue().longValue() >= maxValue && !found.contains(entry.getKey())) {
+					maxValue = entry.getValue().intValue();
 					maxKey = entry.getKey();
 				}
 			}
@@ -219,7 +220,7 @@ public class RucioN2N {
 			Path path = Paths.get(fullName);
 			if (Files.exists(path)) {
 				log.info("found at:" + maxKey);
-				cmap.put(maxKey, cmap.get(maxKey) + 1);
+				cmap.put(maxKey, new AtomicInteger(cmap.get(maxKey).incrementAndGet()));
 				if (filesFound.incrementAndGet() % 1000 == 0)
 					printCounts();
 				return fullName;
@@ -231,7 +232,7 @@ public class RucioN2N {
 	}
 
 	public void printCounts() {
-		for (Map.Entry<String, Integer> entry : cmap.entrySet()) {
+		for (Map.Entry<String, AtomicInteger> entry : cmap.entrySet()) {
 			log.info("space token: {}  value  {}", entry.getKey(), entry.getValue());
 		}
 	}
