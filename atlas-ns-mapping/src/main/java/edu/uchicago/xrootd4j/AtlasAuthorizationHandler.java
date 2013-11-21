@@ -33,8 +33,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 
 	final static Logger log = LoggerFactory.getLogger(AtlasAuthorizationHandler.class);
 
-	public URI lfcUri = null;
-
+	
 	private LFCConfig config = null;
 	private String LFC_HOST = "";
 	private String SRM_HOST = "";
@@ -131,6 +130,8 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 		LFN = "lfn://" + LFC_HOST + "//grid" + LFN;
 
 		log.info("FINALY translating: " + LFN);
+		
+		URI lfcUri = null;
 
 		if (config != null) { // access through API
 
@@ -317,7 +318,7 @@ public class AtlasAuthorizationHandler implements AuthorizationHandler {
 		log.debug("filename changed to pathena one -> " + path);
 
 		try {
-			entry = lfcServer.fetchFileDesc(lfcUri.getPath());
+			entry = lfcServer.fetchFileDesc(path);
 		} catch (Exception e1) {
 			log.info("*** It did not work. ");
 			return entry;
