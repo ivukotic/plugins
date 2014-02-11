@@ -70,9 +70,9 @@ public class Collector {
 	private final UDPsender sender;
 	private UDPmessage mess;
 	private int DetailedLocalSendingPort;
-	private Timer tDetailed; 
+	private Timer tDetailed;
 	private float factor;
-	
+
 	Collector(Properties properties) {
 		this.properties = properties;
 		sender = new UDPsender();
@@ -80,10 +80,10 @@ public class Collector {
 		init();
 	}
 
-	public ConnectionInfo getCI(Integer connid){
+	public ConnectionInfo getCI(Integer connid) {
 		return cmap.get(connid);
-	} 
-	
+	}
+
 	private void init() {
 
 		// if not defined will try to get it using getHostName.
@@ -148,22 +148,25 @@ public class Collector {
 		Timer timer = new Timer();
 		// this is used for printing out state and sending "=" stream
 		timer.schedule(new currentStatus(), 0, 5 * 60 * 1000);
-		
-		factor=1;
+
+		factor = 1;
 		createReportingThreads();
 	}
 
-	// this is rescheduling sending of information in case UDP packets would grow too large
-	private void createReportingThreads( ){
-		if (tDetailed!=null){
+	// this is rescheduling sending of information in case UDP packets would
+	// grow too large
+	private void createReportingThreads() {
+		if (tDetailed != null) {
 			logger.warn("removing detailed reporting timer");
 			tDetailed.cancel();
 		}
 		tDetailed = new Timer();
-		if (ca.reportDetailed == true)
-			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, (long) (ca.detailed.get(0).delay * 1000 * factor) );
+		if (ca.reportDetailed == true) {
+			logger.warn("detailed reporting timer set at {} ms.", ca.detailed.get(0).delay * 1000 * factor);
+			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, (long) (ca.detailed.get(0).delay * 1000 * factor));
+		}
 	}
-	
+
 	public void addConnectionAttempt() {
 		connectionAttempts.getAndIncrement();
 	}
@@ -179,8 +182,8 @@ public class Collector {
 		maxConnectionsCheck();
 		cmap.put(connectionId, new ConnectionInfo(connectionId, DetailedLocalSendingPort));
 	}
-	
-	private synchronized void maxConnectionsCheck(){
+
+	private synchronized void maxConnectionsCheck() {
 		if (cmap.size() > maxConnections.get())
 			maxConnections.set(cmap.size());
 	}
@@ -297,7 +300,7 @@ public class Collector {
 							logger.error("summary stream IO completed. did not send info:{}", future.getCause());
 						}
 					}
-					
+
 				});
 
 			} catch (Exception e) {
@@ -515,15 +518,17 @@ public class Collector {
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
 				mess.put(db);
-				
+
 				// if message is long, half the reporting time
-				if (plen>32000 && factor>0.1) {
-					factor=factor/2;
-					createReportingThreads();
-				}else{
+				if (plen > 32000) {
+					if (factor > 0.1) {
+						factor = factor / 2;
+						createReportingThreads();
+					}
+				} else {
 					// if not prolong it up to 1.
-					if(factor<1){
-						factor=factor*2;
+					if (factor < 1) {
+						factor = factor * 2;
 						createReportingThreads();
 					}
 				}
