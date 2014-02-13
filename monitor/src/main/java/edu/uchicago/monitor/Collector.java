@@ -68,24 +68,31 @@ public class Collector {
 	private CollectorAddresses ca = new CollectorAddresses();
 
 	private final UDPsender sender;
-	private UDPmessage mess;
+	private final UDPmessage mess;
 	private int DetailedLocalSendingPort;
 	private Timer tDetailed;
 	private float factor;
 
-	Collector(Properties properties) {
-		this.properties = properties;
+
+	Collector() {
+    	logger.debug("Collector constructor!");
 		sender = new UDPsender();
 		mess = new UDPmessage();
-		init();
 	}
-
+	
+	
 	public ConnectionInfo getCI(Integer connid) {
 		return cmap.get(connid);
 	}
 
-	private void init() {
-
+	void init(Properties properties) {
+		
+		if (this.properties != null){
+	    	logger.debug("Collector properties were already set...");
+	    	return;
+		}
+		this.properties = properties;
+		
 		// if not defined will try to get it using getHostName.
 		String pServerName = properties.getProperty("servername");
 		if (pServerName != null) {

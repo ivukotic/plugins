@@ -7,13 +7,19 @@ import java.util.Set;
 
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 import org.jboss.netty.channel.ChannelHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
-public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
-{
+public class MonitorChannelHandlerFactory implements ChannelHandlerFactory{
+	
+
+	final static Logger logger = LoggerFactory.getLogger(MonitorChannelHandlerFactory.class);
+	
     final static String NAME = "edu.uchicago.monitor";    
     final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
     
-    private Collector collector;
+    final static Collector collector=new Collector();
+    
     
     static boolean hasName(String name)
     {
@@ -22,7 +28,10 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
 
     public MonitorChannelHandlerFactory(Properties properties)
     {	
-    	collector = new Collector(properties);
+    	
+    		logger.debug("setting collector properties...");
+    		collector.init(properties);
+    	
     }
 
     @Override
@@ -39,7 +48,8 @@ public class MonitorChannelHandlerFactory implements ChannelHandlerFactory
 
     @Override
     public ChannelHandler createHandler()
-    {
+    {	
+    	logger.debug("creating a new MonitorChannelHandler...");
         return new MonitorChannelHandler( collector );
     }
 }
