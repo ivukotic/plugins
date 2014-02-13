@@ -1,25 +1,10 @@
 package edu.uchicago.monitor;
 
-import static org.junit.Assert.*;
-
-import org.dcache.xrootd.plugins.ChannelHandlerFactory;
-import org.jboss.netty.bootstrap.ServerBootstrap;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.ChannelStateEvent;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
-import org.jboss.netty.handler.codec.serialization.ObjectDecoder;
-import org.jboss.netty.handler.codec.string.StringDecoder;
-import org.jboss.netty.handler.codec.string.StringEncoder;
-import org.jboss.netty.util.CharsetUtil;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.InetSocketAddress;
 import java.util.Properties;
-import java.util.concurrent.Executors;
 
 public class MonitorChannelHandlerFactoryTest {
 
@@ -71,7 +56,8 @@ public class MonitorChannelHandlerFactoryTest {
 		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
 
 		int cid=123456;
-		Collector c = new Collector(props);
+		Collector c = new Collector();
+		c.init(props);
 		for (int w = 0; w < 3; w++) {
 
 			// user logged in message "u"
