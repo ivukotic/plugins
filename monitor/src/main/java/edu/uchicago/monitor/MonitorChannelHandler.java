@@ -30,7 +30,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	private final Collector collector;
 	private int connId;
-	private static AtomicInteger fileCounter = new AtomicInteger();;
+	private static AtomicInteger fileCounter = new AtomicInteger();
 
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
@@ -235,12 +235,13 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					mode = 1;
 				else
 					mode = 0; // not correct
+				
 				fileCounter.compareAndSet(9999999, 0);
-				FileStatistics fs = new FileStatistics(fileCounter.intValue());
+				FileStatistics fs = new FileStatistics(fileCounter.incrementAndGet());
 				fs.filename = or.getPath();
 				fs.mode = mode;
 				fs.filesize = OR.getFileStatus().getSize();
-				logger.warn("FILE OPEN RESPONSE    connId: {}   readonly: {}   path :{},  fileCounter: {}", connId, mode, fs.filename, fs.fileCounter);
+				logger.warn("FILE OPEN RESPONSE  connId: {}    path :{},  fileCounter: {}", connId, fs.filename, fs.fileCounter);
 				collector.getCI(connId).addFile(OR.getFileHandle(), fs);
 			}
 

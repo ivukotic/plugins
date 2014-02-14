@@ -355,14 +355,14 @@ public class Collector {
 			try {
 				fseq += 1;
 
-				short plen = (short) (24); // this is length of 2 mandatory
+				int plen = (int) (24); // this is length of 2 mandatory
 											// headers
 				ChannelBuffer db = dynamicBuffer(plen);
 
 				// main header - XrdXrootdMonHeader - 8 bytes
 				db.writeByte((byte) 102); // 'f'
 				db.writeByte((byte) fseq);
-				db.writeShort(plen); // will be replaced later
+				db.writeShort((short) plen); // will be replaced later
 				db.writeInt(tos); // time of server start
 
 				// first timing header - XrdXrootdMonFileTOD - 16 bytes
@@ -496,7 +496,9 @@ public class Collector {
 								db.writeDouble(123.123);
 							}
 							// remove it
-							cent.getValue().allFiles.remove(fent);
+							if(cent.getValue().allFiles.remove(fent.getKey())==null)
+								logger.error("Could not remove closed file!");
+							
 							subpackets += 1;
 							plen += packlength;
 						}
@@ -516,29 +518,32 @@ public class Collector {
 						db.writeInt(ent.getKey()); // userID
 						subpackets += 1;
 						plen += 8;
-						cmap.remove(ent);
+						cmap.remove(ent.getKey());
 					}
 				}
 
-				logger.debug("message length: {} \t buffer length: {}", plen, db.writableBytes());
-				db.setShort(2, plen);
+				logger.warn("f-stream message length: {} \t buffer length: {}", plen, db.writableBytes());
+				db.setShort(2, (short) plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
-				mess.put(db);
+				if (plen>0 && plen<32767)
+					mess.put(db);
+				else 
+					logger.warn("f-stream message longer than 32k. Not sending it.");
 
 				// if message is long, half the reporting time
-				if (plen > 32000) {
+				if (plen > 20000) {
 					if (factor > 0.1) {
 						factor = factor / 2;
 						createReportingThreads();
 					}
-				} else {
-					// if not prolong it up to 1.
-					if (factor < 1) {
+				}
+				// if message is smaller and of reduced size increase the period
+				if (plen<10000 && factor < 1) {
 						factor = factor * 2;
 						createReportingThreads();
-					}
 				}
+				
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending f-stream:{} ", e.getMessage());
 			}
