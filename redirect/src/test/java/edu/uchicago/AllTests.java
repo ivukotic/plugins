@@ -5,7 +5,7 @@ import org.junit.runners.Suite;
 import org.junit.runners.Suite.SuiteClasses;
 
 @RunWith(Suite.class)
-@SuiteClasses({ RucioN2NTest.class, TranslateRucioNames.class })
+@SuiteClasses({  })
 public class AllTests {
 
 }

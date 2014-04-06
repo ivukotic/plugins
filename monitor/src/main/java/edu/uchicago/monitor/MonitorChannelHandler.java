@@ -2,8 +2,10 @@ package edu.uchicago.monitor;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.dcache.xrootd.protocol.XrootdProtocol;
 import org.dcache.xrootd.protocol.messages.AbstractResponseMessage;
 import org.dcache.xrootd.protocol.messages.CloseRequest;
+import org.dcache.xrootd.protocol.messages.ErrorResponse;
 import org.dcache.xrootd.protocol.messages.GenericReadRequestMessage.EmbeddedReadRequest;
 import org.dcache.xrootd.protocol.messages.LoginRequest;
 import org.dcache.xrootd.protocol.messages.OpenRequest;
@@ -11,6 +13,7 @@ import org.dcache.xrootd.protocol.messages.OpenResponse;
 import org.dcache.xrootd.protocol.messages.ProtocolRequest;
 import org.dcache.xrootd.protocol.messages.ReadRequest;
 import org.dcache.xrootd.protocol.messages.ReadVRequest;
+import org.dcache.xrootd.protocol.messages.RedirectResponse;
 import org.dcache.xrootd.protocol.messages.WriteRequest;
 import org.dcache.xrootd.protocol.messages.XrootdRequest;
 import org.jboss.netty.channel.ChannelEvent;
@@ -203,11 +206,11 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 		super.handleUpstream(ctx, e);
 	}
-
+	
 	@Override
 	public void handleDownstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
 
-		// logger.info("DOWN mess:"+ e.toString());
+//		 logger.debug("DOWN mess {}", e.toString());
 
 		if (e instanceof MessageEvent) {
 			// logger.debug("MessageEvent DOWN");
@@ -219,6 +222,19 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				logger.error("response before request! very strange");
 			}
 
+			if (me instanceof ErrorResponse) {
+            	logger.error("ERRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOORRRRRRRRRRRRR");
+	            ErrorResponse error = (ErrorResponse) me;
+	            if (error.getRequest() instanceof OpenRequest && error.getErrorNumber() == XrootdProtocol.kXR_NotFound) {
+	            	logger.error("error on open."+ error.toString());
+	            	int port=1094;
+	            	String host="myRedirector.com"; 
+	            	logger.error("will redirect:"+ e.toString());
+	                e.getChannel().write(new RedirectResponse(error.getRequest(), host, port, "", ""));
+	                return;
+	            }
+	        }
+			
 			// if (message instanceof ReadResponse){
 			// // this happens a lot
 			// }

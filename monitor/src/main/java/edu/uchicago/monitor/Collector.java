@@ -170,7 +170,7 @@ public class Collector {
 		tDetailed = new Timer();
 		if (ca.reportDetailed == true) {
 			logger.warn("detailed reporting timer set at {} ms.", ca.detailed.get(0).delay * 1000 * factor);
-			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 0, (long) (ca.detailed.get(0).delay * 1000 * factor));
+			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 2000, (long) (ca.detailed.get(0).delay * 1000 * factor));
 		}
 	}
 
