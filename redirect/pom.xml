@@ -27,7 +27,7 @@
 			<id>dcache.repository</id>
 			<url>http://www.dcache.org/nexus/content/groups/public</url>
 			<snapshots>
-				<enabled>true</enabled>
+				<enabled>false</enabled>
 				<updatePolicy>always</updatePolicy>
 			</snapshots>
 		</repository>

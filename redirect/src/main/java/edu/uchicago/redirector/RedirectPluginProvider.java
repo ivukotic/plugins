@@ -15,10 +15,9 @@ public class RedirectPluginProvider implements ChannelHandlerProvider {
     @Override
     public ChannelHandlerFactory createFactory(String plugin, Properties properties)
     {
-    	logger.error("CREATEDDDDDDDDDDDDDDDDDDDD..."+plugin);
+    	logger.debug("Created ChannelHandler Factory: "+plugin);
     	
         if (RedirectPluginFactory.hasName(plugin)) {
-        	logger.error("HASNAME...");
             return new RedirectPluginFactory(properties);
         }
         return null;
