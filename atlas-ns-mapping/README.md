@@ -1,7 +1,7 @@
-Channel handler plugin for xrootd4j and dCache
-==============================================
+Authorization and mapping plugin for xrootd4j and dCache
+========================================================
 
-This is a channel handler plugin for xrootd4j and dCache.
+This is an authorization and mapping plugin for xrootd4j and dCache.
 
 To compile the plugin, run:
 
@@ -9,39 +9,18 @@ To compile the plugin, run:
 
 
 The plugin can be tested by loading it with the xrootd4j standalone
-server available from http://github.com/dcache/xrootd4j:
+server available from http://github.com/dCache/xrootd4j:
 
-    java -Dlog=debug  \
-		 -Dsitename=TEST.uc \
-		 -Dsummary=test.stanford.edu:9931:60,localhost:9931:17 \
-		 -Ddetailed=localhost:9930:13
-         -jar /path/to/xrootd4j/xrootd4j-standalone-1.1.0-jar-with-dependencies.jar \
-         --plugins target/monitor-1.0-SNAPSHOT/ \
-         --handler authn:none,edu.uchicago.monitor
-
-You may select several destinations to send collected information to. Each destination is given in form:
-<hostname>:<port>[:<interval>[:<outbound port>]]
-Interval signifies wait period in seconds between two consecutive sendings of information to that server.
-Replace values given with the real ones.
+    java -Dlog=debug 
+         -jar /path/to/xrootd4j/xrootd4j-standalone-1.0.1-jar-with-dependencies.jar \
+         --plugins target/atlas-ns-mapping-2.0-SNAPSHOT/ \
+         --handler authn:none,authz:atlas-name-to-name-plugin
 
 Using the plugin with dCache
 ----------------------------
 
 To use this plugin with dCache, place the directory containing this
 file in /usr/local/share/dcache/plugins/
-
-
-On the pool nodes you need only monitoring plugin:
-
-	### plugins
-	pool/xrootdPlugins=edu.uchicago.monitor
-    
-	### Monitoring plugin
-    summary=atl-prod05.slac.stanford.edu:9931:60
-	detailed=atl-prod05.slac.stanford.edu:9930:60
-
-
-FOR ATLAS only:
 
 on a door node you need both N2N and monitor:
     
@@ -73,7 +52,7 @@ when directly federating xrootd dCache doors one needs in addition an upstream r
     xrootd.redirector.host = atlas-xrd-us.usatlas.org
     xrootd.redirector.port = 1094
 
-If your server is behind NAT, you should also define property servername in a form:
-	servername=myserver.mydomain.org
-
-
+    
+probably never needed still if someone wants to hide a SpaceToken from FAX, just add this variable listing all of the space tokens you want exposed.
+    overwriteSE=/pnfs/uchicago.edu/atlasgroupdisk,/pnfs/uchicago.edu/atlasproddisk
+    
