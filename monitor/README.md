@@ -9,7 +9,7 @@ To compile the plugin, run:
 
 
 The plugin can be tested by loading it with the xrootd4j standalone
-server available from http://github.com/gbehrmann/xrootd4j:
+server available from http://github.com/dcache/xrootd4j:
 
     java -Dlog=debug  \
 		 -Dsitename=TEST.uc \
