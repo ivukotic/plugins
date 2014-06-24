@@ -33,25 +33,36 @@ file in /usr/local/share/dcache/plugins/
 
 On the pool nodes you need only monitoring plugin:
 
-	### Monitoring plugin
+	### plugins
 	pool/xrootdPlugins=edu.uchicago.monitor
-	summary=atl-prod05.slac.stanford.edu:9931:60
+    
+	### Monitoring plugin
+    summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
 
 on a door node you need both N2N and monitor:
-
+	
+    ### plugins
+	xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin
+    
 	### Monitoring plugin
 	pool/xrootdPlugins=edu.uchicago.monitor
-	### N2N plugin
-	xrootdAuthzPlugin=atlas-name-to-name-plugin
-	
+	summary=atl-prod05.slac.stanford.edu:9931:60
+	detailed=atl-prod05.slac.stanford.edu:9930:60
+    	
+when directly federating xrootd dCache doors one needs in addition an upstream redirector plugin on the door node:
+    
+	### plugins
+	xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin,redirector
+    	
+    ### Monitoring plugin
+	pool/xrootdPlugins=edu.uchicago.monitor
 	summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
 
-While using xrootdAuthzPlugin gives a worning message that it is obsolete, command:   
-	xrootd/ xrootdPlugins=authn:atlas-name-to-name-plugin,authz:none
-was not properly tested.
-	
+    #Redirector plugin
+    xrootd.redirector.host = atlas-xrd-us.usatlas.org
+    xrootd.redirector.port = 1094
 
 If your server is behind NAT, you should also define property servername in a form:
 	servername=myserver.mydomain.org
