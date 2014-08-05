@@ -522,7 +522,7 @@ public class Collector {
 					}
 				}
 
-				logger.warn("f-stream message length: {} \t buffer length: {}", plen, db.writableBytes());
+				logger.debug("f-stream message length: {} \t buffer length: {}", plen, db.writableBytes());
 				db.setShort(2, (short) plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);

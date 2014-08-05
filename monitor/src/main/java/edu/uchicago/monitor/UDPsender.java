@@ -30,7 +30,6 @@ public class UDPsender extends Thread {
 	int init(CollectorAddresses ca, UDPmessage m) {
 
 		message = m;		
-
 		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
 		cbsDetailed = new ConnectionlessBootstrap(f);
 		cbsDetailed.setOption("localAddress", new InetSocketAddress(0));
