@@ -55,7 +55,7 @@ public class MonitorChannelHandlerFactoryTest {
 		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10:9999");
 		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
 
-		int cid=123456;
+//		int cid=123456;
 		Collector c = new Collector();
 		c.init(props);
 		for (int w = 0; w < 3; w++) {

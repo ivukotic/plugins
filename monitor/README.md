@@ -15,6 +15,7 @@ server available from http://github.com/dcache/xrootd4j:
 		 -Dsitename=TEST.uc \
 		 -Dsummary=test.stanford.edu:9931:60,localhost:9931:17 \
 		 -Ddetailed=localhost:9930:13
+		 -Dvo=atlas
          -jar /path/to/xrootd4j/xrootd4j-standalone-1.1.0-jar-with-dependencies.jar \
          --plugins target/monitor-1.0-SNAPSHOT/ \
          --handler authn:none,edu.uchicago.monitor
@@ -39,6 +40,7 @@ On the pool nodes you need only monitoring plugin:
 	### Monitoring plugin
     summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
+	vo=ATLAS
 
 
 FOR ATLAS only:
@@ -55,6 +57,7 @@ on a door node you need both N2N and monitor:
 	pool/xrootdPlugins=edu.uchicago.monitor
 	summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
+	vo=ATLAS
     	
 when directly federating xrootd dCache doors one needs in addition an upstream redirector plugin on the door node:
     
@@ -68,6 +71,7 @@ when directly federating xrootd dCache doors one needs in addition an upstream r
 	pool/xrootdPlugins=edu.uchicago.monitor
 	summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
+	vo=ATLAS
 
     #Redirector plugin
     xrootd.redirector.host = atlas-xrd-us.usatlas.org

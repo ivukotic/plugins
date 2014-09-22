@@ -72,6 +72,7 @@ public class Collector {
 	private int DetailedLocalSendingPort;
 	private Timer tDetailed;
 	private float factor;
+	private String virtualOrganization;
 
 
 	Collector() {
@@ -107,7 +108,16 @@ public class Collector {
 				e.printStackTrace();
 			}
 		}
-
+		
+		String pVO = properties.getProperty("vo");
+		if (pVO != null){
+			logger.info("Setting VO to " + pVO);
+			virtualOrganization = pVO;
+		}else{
+			logger.warn("Could not get VO. Will set it to -unknown- ");
+			virtualOrganization = "unknown";
+		}
+		
 		String pSitename = properties.getProperty("site");
 		if (pSitename != null)
 			sitename = pSitename;
@@ -214,7 +224,7 @@ public class Collector {
 		ConnectionInfo ci = cmap.get(connectionId);
 		if (ci != null) {
 			ci.logUserResponse(((InetSocketAddress) remoteAddress).getHostName(), ((InetSocketAddress) remoteAddress).getPort());
-			SendMapMessage((byte) 117, connectionId, ci.ui.getFullInfo());
+			SendMapMessage((byte) 117, connectionId, ci.ui.getFullInfo(virtualOrganization));
 		} else {
 			logger.error("Could not map connection {} to user.", connectionId);
 		}

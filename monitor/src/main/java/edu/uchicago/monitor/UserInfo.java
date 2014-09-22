@@ -22,8 +22,8 @@ public class UserInfo {
 		return name + "." + pid + ":" + ((long) pid << 16 | serverPort) + "@" + host;
 	}
 	
-	public String getFullInfo() {
-		return name + "." + pid + ":" + ((long) pid << 16 | serverPort) + "@" + host + "\n&p=X509&n=" + name + "&h=" + host + "&o=&r=&g=&m=/OU=xrootd-collector/CN="+name;
+	public String getFullInfo(String vo) {
+		return name + "." + pid + ":" + ((long) pid << 16 | serverPort) + "@" + host + "\n&p=X509&n=" + name + "&h=" + host + "&o="+vo+"&r=&g=&m=";
 	}
 
 	public String toString() {
