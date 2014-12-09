@@ -5,7 +5,7 @@
 
 	<groupId>edu.uchicago.redirector</groupId>
 	<artifactId>redirector</artifactId>
-	<version>1.0.1</version>
+	<version>1.0.2</version>
 	<packaging>jar</packaging>
 
 	<name>dCache xrootd redirector plugin</name>
