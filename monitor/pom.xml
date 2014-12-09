@@ -4,7 +4,6 @@
 
   <groupId>edu.uchicago</groupId>
   <artifactId>monitor</artifactId>
-  <version>5.0.9</version>
   <packaging>jar</packaging>
 
   <name>ATLAS dCache xrootd monitor</name>
@@ -92,4 +91,5 @@
           </plugin>
       </plugins>
   </build>
+  <version>5.0.9</version>
 </project>
