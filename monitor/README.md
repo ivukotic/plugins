@@ -35,7 +35,9 @@ file in /usr/local/share/dcache/plugins/
 On the pool nodes you need only monitoring plugin:
 
 	### plugins
-	pool/xrootdPlugins=edu.uchicago.monitor
+    pool.mover.xrootd.plugins=edu.uchicago.monitor
+    # for old dCache versions up to 2.6 use
+	# pool/xrootdPlugins=edu.uchicago.monitor
     
 	### Monitoring plugin
     summary=atl-prod05.slac.stanford.edu:9931:60
@@ -51,10 +53,14 @@ on a door node you need both N2N and monitor:
     site=rc_site
 	
     ### plugins
-	xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin
+    xrootd.plugins=gplazma:gsi,authz:atlas-name-to-name-plugin
+    # for old dCache versions up to 2.6 use
+	# xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin
     
 	### Monitoring plugin
-	pool/xrootdPlugins=edu.uchicago.monitor
+    pool.mover.xrootd.plugins=edu.uchicago.monitor
+    # for old dCache versions up to 2.6 use
+	# pool/xrootdPlugins=edu.uchicago.monitor
 	summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
 	vo=ATLAS
@@ -65,10 +71,14 @@ when directly federating xrootd dCache doors one needs in addition an upstream r
     site=rc_site
     
 	### plugins
-	xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin,redirector
+    xrootd.plugins=gplazma:gsi,authz:atlas-name-to-name-plugin,redirector
+    # for old dCache versions up to 2.6 use
+	# xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin,redirector
     	
     ### Monitoring plugin
-	pool/xrootdPlugins=edu.uchicago.monitor
+    pool.mover.xrootd.plugins=edu.uchicago.monitor
+    # for old dCache versions up to 2.6 use
+	# pool/xrootdPlugins=edu.uchicago.monitor
 	summary=atl-prod05.slac.stanford.edu:9931:60
 	detailed=atl-prod05.slac.stanford.edu:9930:60
 	vo=ATLAS
