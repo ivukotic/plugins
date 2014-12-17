@@ -13,12 +13,12 @@ import org.slf4j.LoggerFactory;
 public class MonitorChannelHandlerFactory implements ChannelHandlerFactory{
 	
 
-	final static Logger logger = LoggerFactory.getLogger(MonitorChannelHandlerFactory.class);
+	private final static Logger logger = LoggerFactory.getLogger(MonitorChannelHandlerFactory.class);
 	
-    final static String NAME = "edu.uchicago.monitor";    
-    final static Set<String> ALTERNATIVE_NAMES = new HashSet<String>(Arrays.asList(NAME));
+    private final static String NAME = "edu.uchicago.monitor";
+    private final static Set<String> ALTERNATIVE_NAMES = new HashSet<>(Arrays.asList(NAME));
     
-    final static Collector collector=new Collector();
+    private final static Collector collector = new Collector();
     
     
     static boolean hasName(String name)

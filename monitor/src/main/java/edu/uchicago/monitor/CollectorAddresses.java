@@ -10,9 +10,9 @@ import org.slf4j.LoggerFactory;
 
 public class CollectorAddresses {
 
-	final static Logger logger = LoggerFactory.getLogger(CollectorAddresses.class);
-	public ArrayList<Address> summary = new ArrayList<Address>();
-	public ArrayList<Address> detailed = new ArrayList<Address>();
+	private final static Logger logger = LoggerFactory.getLogger(CollectorAddresses.class);
+	public final ArrayList<Address> summary = new ArrayList<>();
+	public final ArrayList<Address> detailed = new ArrayList<>();
 	public boolean reportSummary = false;
 	public boolean reportDetailed = false;
 
@@ -23,26 +23,22 @@ public class CollectorAddresses {
 
 		String pSummary = properties.getProperty("summary");
 		if (pSummary != null) {
-			String[] tempSummary = pSummary.split(",");
-			for (int i = 0; i < tempSummary.length; i++) {
+			for (String summaryAddress : pSummary.split(",")) {
 				try {
-					summary.add(new Address(tempSummary[i]));
+					this.summary.add(new Address(summaryAddress));
 				} catch (IllegalArgumentException e) {
-					logger.warn("could not interpret summary address: "+tempSummary[i]);
-					logger.warn(e.getMessage());
+					logger.warn("could not interpret summary address {}: {}", summaryAddress, e.getMessage());
 				}
 			}
 		}
 
 		String pDetailed = properties.getProperty("detailed");
 		if (pDetailed != null) {
-			String[] tempDetailed = pDetailed.split(",");
-			for (int i = 0; i < tempDetailed.length; i++) {
+			for (String detailedAddress : pDetailed.split(",")) {
 				try {
-					detailed.add(new Address(tempDetailed[i]));
+					detailed.add(new Address(detailedAddress));
 				} catch (IllegalArgumentException e) {
-					logger.warn("could not interpret detailed address: "+tempDetailed[i]);
-					logger.warn(e.getMessage());
+					logger.warn("could not interpret detailed address {}: {}",detailedAddress, e.getMessage());
 				}
 			}
 		}
@@ -58,25 +54,26 @@ public class CollectorAddresses {
 	
 	@Override
 	public String toString() {
-		String res = "";
+		StringBuilder res = new StringBuilder();
 		if (summary.size() > 0) {
-			res += "Summary information will be sent to: \n";
+			res.append("Summary information will be sent to: \n");
 			for (Address a : summary) {
-				res += a.toString();
+				res.append(a);
 			}
-		} else
-			res += "Summary information will not be sent.\n";
+		} else {
+			res.append("Summary information will not be sent.\n");
+		}
 
 		if (detailed.size() > 0) {
-			res += "Detailed information will be sent to: \n";
+			res.append("Detailed information will be sent to: \n");
 			for (Address a : detailed) {
-				res += a.toString();
+				res.append(a.toString());
 				break;
 			}
-		} else
-			res += "Detailed information will not be sent.\n";
-
-		return res;
+		} else {
+			res.append("Detailed information will not be sent.\n");
+		}
+		return res.toString();
 	}
 
 }
