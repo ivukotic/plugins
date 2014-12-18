@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 class FileStatistics {
-	public int fileCounter;
+	public final int fileCounter;
 	public long filesize = -1;
 	public String filename = "";
 	public int mode = -1;
@@ -27,11 +27,14 @@ class FileStatistics {
 
 	@Override
 	public String toString() {
-		String res = "filename:\t" + filename;
-		res += "\n\tmode: " + mode + "\t\tsize:\t" + filesize;
-		res += "\n\twritten:\t" + bytesWritten + " bytes\t\t\tread:\t" + bytesRead + "\t\t\t Vread:\t" + bytesVectorRead;
-		res += "\n\treads:\t" + reads + "\t\t\tVreads:\t" + vectorReads + "\t\t\twrites:\t" + writes;
-		return res;
+		StringBuilder res = new StringBuilder();
+		res.append("filename:\t").append(filename);
+		res.append("\n\tmode: ").append(mode).append("\t\tsize:\t").append(filesize);
+		res.append("\n\twritten:\t").append(bytesWritten).append(" bytes\t\t\tread:\t").append(bytesRead).append(
+				"\t\t\t Vread:\t").append(bytesVectorRead);
+		res.append("\n\treads:\t").append(reads).append("\t\t\tVreads:\t").append(vectorReads).append("\t\t\twrites:\t").append(
+				writes);
+		return res.toString();
 
 	}
 

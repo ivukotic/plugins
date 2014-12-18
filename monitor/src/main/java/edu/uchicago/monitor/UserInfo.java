@@ -1,11 +1,11 @@
 package edu.uchicago.monitor;
 
 public class UserInfo {
-	private String name;
-	private int pid;
+	private final String name;
+	private final int pid;
 	private String host;
 	private int port;
-	private int serverPort;
+	private final int serverPort;
 
 	UserInfo(String name, int pid, int serverPort) {
 		this.name = name;

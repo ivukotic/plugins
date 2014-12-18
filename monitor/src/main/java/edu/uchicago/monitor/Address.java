@@ -3,12 +3,12 @@ package edu.uchicago.monitor;
 
 public class Address {
 	
-	public String address;
-	public int port;
-	public int delay;
-	public int outboundport=0;
+	public final String address;
+	public final int port;
+	public final int delay;
+	public final int outboundport;
 
-	Address(String param) throws IllegalArgumentException {
+	public Address(String param) throws IllegalArgumentException {
 		String[] temp;
 		temp = param.split(":");
 		if (temp.length < 2)
@@ -22,6 +22,7 @@ public class Address {
 			throw new IllegalArgumentException("Incorrect collector address format: port: " + temp[1] + " should be integer number.");
 		}
 
+		int outboundport = 0;
 		if (temp.length > 2) {
 			try {
 				delay = Integer.parseInt(temp[2]);
@@ -36,10 +37,10 @@ public class Address {
 					throw new IllegalArgumentException("Incorrect collector outbound port: " + temp[3] + " should be integer number.");
 				}
 			}
-
-		} else
+		} else {
 			delay = 60;
-
+		}
+		this.outboundport = outboundport;
 	}
 
 	@Override

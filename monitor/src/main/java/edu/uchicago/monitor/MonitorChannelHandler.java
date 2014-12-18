@@ -29,11 +29,11 @@ import org.slf4j.LoggerFactory;
 
 public class MonitorChannelHandler extends SimpleChannelHandler {
 
-	final static Logger logger = LoggerFactory.getLogger(MonitorChannelHandler.class);
+	private final static Logger logger = LoggerFactory.getLogger(MonitorChannelHandler.class);
+	private final static AtomicInteger fileCounter = new AtomicInteger();
 
 	private final Collector collector;
 	private int connId;
-	private static AtomicInteger fileCounter = new AtomicInteger();
 
 	public MonitorChannelHandler(Collector c) {
 		collector = c;
@@ -41,7 +41,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 
 	@Override
 	public void handleUpstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
-		logger.debug("UP mess: {}", e.toString());
+		logger.debug("UP mess: {}", e);
 
 		if (e instanceof MessageEvent) {
 			// logger.info("MessageEvent UP");
@@ -135,9 +135,9 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 				// req.toString());
 			} else if (message instanceof XrootdRequest) {
 				XrootdRequest req = (XrootdRequest) message;
-				logger.info("I-> streamID: {} \treqID: {}\t data: {}", req.getStreamId(), req.getRequestId(), req.toString());
+				logger.info("I-> streamID: {} \treqID: {}\t data: {}", req.getStreamId(), req.getRequestId(), req);
 			} else {
-				logger.info("Unhandled message event UP: {}", me.toString());
+				logger.info("Unhandled message event UP: {}", me);
 			}
 		}
 
@@ -183,7 +183,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			else {
-				logger.info("Unhandled ChannelState Event UP : {} \t {}", se.getState().toString(), se.toString());
+				logger.info("Unhandled ChannelState Event UP : {} \t {}", se.getState(), se);
 			}
 
 		}
@@ -195,9 +195,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		}
 
 		else if (e instanceof ExceptionEvent) {
-			logger.info("ExceptionEvent UP");
-			ExceptionEvent dee = (ExceptionEvent) e;
-			logger.error("eXception thrown message {}", dee.toString());
+			logger.error("eXception thrown message {}", e);
 		}
 
 		else { // completely impossible
@@ -223,13 +221,12 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 			}
 
 			if (me instanceof ErrorResponse) {
-            	logger.error("ERRRRRRRRRRRRRRRRRRRRRRROOOOOOOOOOOOOOOOORRRRRRRRRRRRR");
 	            ErrorResponse error = (ErrorResponse) me;
 	            if (error.getRequest() instanceof OpenRequest && error.getErrorNumber() == XrootdProtocol.kXR_NotFound) {
-	            	logger.error("error on open."+ error.toString());
+	            	logger.error("error on open. {}", error);
 	            	int port=1094;
 	            	String host="myRedirector.com"; 
-	            	logger.error("will redirect:"+ e.toString());
+	            	logger.error("will redirect: {}", e);
 	                e.getChannel().write(new RedirectResponse(error.getRequest(), host, port, "", ""));
 	                return;
 	            }
@@ -269,14 +266,14 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 					collector.loggedEvent(connId, e.getChannel().getRemoteAddress());
 				}
 			} else {
-				logger.warn("Unhandled MessageEvent DOWN: {}", me.toString());
+				logger.warn("Unhandled MessageEvent DOWN: {}", me);
 			}
 
 		}
 
 		else if (e instanceof ChannelStateEvent) {
 			ChannelStateEvent se = (ChannelStateEvent) e;
-			logger.info("Channel State Event DOWN : {} \t {}", se.getState().toString(), se.getValue().toString());
+			logger.info("Channel State Event DOWN : {} \t {}", se.getState(), se.getValue());
 		}
 
 		else if (e instanceof WriteCompletionEvent) {
@@ -287,9 +284,7 @@ public class MonitorChannelHandler extends SimpleChannelHandler {
 		}
 
 		else if (e instanceof ExceptionEvent) {
-			logger.info("ExceptionEvent DOWN");
-			ExceptionEvent dee = (ExceptionEvent) e;
-			logger.error("eXception thrown message {}", dee.toString());
+			logger.error("eXception thrown message {}", e);
 		}
 
 		else { // completely impossible

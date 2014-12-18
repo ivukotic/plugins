@@ -18,7 +18,7 @@ import org.slf4j.LoggerFactory;
 
 
 public class UDPsender extends Thread {
-	final static Logger logger = LoggerFactory.getLogger(UDPsender.class);
+	private final static Logger logger = LoggerFactory.getLogger(UDPsender.class);
 
 	private ConnectionlessBootstrap cbsDetailed;
 	private DatagramChannelFactory f;
@@ -61,7 +61,7 @@ public class UDPsender extends Thread {
 					if (future.isSuccess())
 						logger.info("detailed stream IO completed. success!");
 					else {
-						logger.error("detailed stream IO completed. did not send info:" + future.getCause());
+						logger.error("detailed stream IO completed. did not send info: {}", future.getCause().toString());
 					}
 				}
 			});

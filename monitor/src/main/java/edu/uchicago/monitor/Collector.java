@@ -36,7 +36,7 @@ import org.slf4j.LoggerFactory;
 
 public class Collector {
 
-	final static Logger logger = LoggerFactory.getLogger(Collector.class);
+	private final static Logger logger = LoggerFactory.getLogger(Collector.class);
 
 	private String servername;
 	private String sitename;
@@ -75,7 +75,7 @@ public class Collector {
 	private String virtualOrganization;
 
 
-	Collector() {
+	public Collector() {
     	logger.debug("Collector constructor!");
 		sender = new UDPsender();
 		mess = new UDPmessage();
@@ -101,7 +101,7 @@ public class Collector {
 		} else {
 			try {
 				servername = java.net.InetAddress.getLocalHost().getHostName();
-				logger.info("server name: " + servername);
+				logger.info("server name: {}", servername);
 			} catch (UnknownHostException e) {
 				logger.error("Could not get server's hostname. Will set it to xxx.abc.def");
 				servername = "xxx.abc.def";
@@ -111,10 +111,10 @@ public class Collector {
 		
 		String pVO = properties.getProperty("vo");
 		if (pVO != null){
-			logger.info("Setting VO to " + pVO);
+			logger.info("Setting VO to {}", pVO);
 			virtualOrganization = pVO;
 		}else{
-			logger.warn("Could not get VO. Will set it to -unknown- ");
+			logger.warn("Could not get VO. Will set it to -unknown-");
 			virtualOrganization = "unknown";
 		}
 		
@@ -159,7 +159,7 @@ public class Collector {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
 			cbsSummary.setOption("localAddress", new InetSocketAddress(a.outboundport));
-			logger.info("Setting summary monitoring local port (outbound) to: " + a.outboundport);
+			logger.info("Setting summary monitoring local port (outbound) to: {}", a.outboundport);
 		}
 
 		Timer timer = new Timer();
@@ -232,7 +232,7 @@ public class Collector {
 
 	// type - 117:u 100:d 105:i
 	public void SendMapMessage(byte mtype, Integer dictid, String content) {
-		logger.debug("sending map message: {} -> {}", dictid.toString(), content);
+		logger.debug("sending map message: {} -> {}", dictid, content);
 		try {
 			pseq += 1;
 
@@ -254,23 +254,23 @@ public class Collector {
 	}
 
 	private class SendSummaryStatisticsTask extends TimerTask {
-		private InetSocketAddress destination;
-		private String info;
-		private String STATISTICSstart, STATISTICSend;
-		private String SGENstart, SGENend;
-		private String LINKstart, LINKend;
-		private DatagramChannel c;
+		private final InetSocketAddress destination;
+		private final String info;
+		private final String STATISTICSstart, STATISTICSend;
+		private final String SGENstart, SGENend;
+		private final String LINKstart, LINKend;
+		private final DatagramChannel c;
 		private long lastUpdate;
 
 		SendSummaryStatisticsTask(Address a) {
 			c = (DatagramChannel) cbsSummary.bind();
 			destination = new InetSocketAddress(a.address, a.port);
-			STATISTICSstart = "<statistics ver=\"v1.9.12.21\" pgm=\"xrootd\" ins=\"anon\"";
-			STATISTICSstart += " tos=\"" + tos + "\"";
-			STATISTICSstart += " src=\"" + servername + ":" + c.getLocalAddress().getPort() + "\"";
-			STATISTICSstart += " host=\"" + servername + "\"";
-			STATISTICSstart += " site=\"" + sitename + "\"";
-			STATISTICSstart += " pid=\"" + pid + "\"";
+			STATISTICSstart = "<statistics ver=\"v1.9.12.21\" pgm=\"xrootd\" ins=\"anon\"" +
+							  " tos=\"" + tos + "\"" +
+							  " src=\"" + servername + ":" + c.getLocalAddress().getPort() + "\"" +
+							  " host=\"" + servername + "\"" +
+							  " site=\"" + sitename + "\"" +
+							  " pid=\"" + pid + "\"";
 			STATISTICSend = "</statistics>";
 
 			// needs instance name and proper port - how to get it from dCache?
@@ -294,13 +294,13 @@ public class Collector {
 				long curTime = System.currentTimeMillis() / 1000L;
 				String sgen = SGENstart + "<toe>" + curTime + "</toe>" + SGENend;
 
-				String link = LINKstart;
-				link += "<num>" + cmap.size() + "</num>";
-				link += "<maxn>" + maxConnections.toString() + "</maxn>";
-				link += "<tot>" + connectionAttempts.toString() + "</tot>";
-				link += "<in>" + totBytesWriten.toString() + "</in>";
-				link += "<out>" + totBytesRead.toString() + "</out>";
-				link += LINKend;
+				String link = LINKstart +
+							  "<num>" + cmap.size() + "</num>" +
+							  "<maxn>" + maxConnections + "</maxn>" +
+							  "<tot>" + connectionAttempts + "</tot>" +
+							  "<in>" + totBytesWriten + "</in>" +
+							  "<out>" + totBytesRead + "</out>" +
+							  LINKend;
 
 				String xmlmessage = STATISTICSstart + " tod=\"" + lastUpdate + "\">" + sgen + info + link + STATISTICSend;
 
@@ -314,14 +314,14 @@ public class Collector {
 						if (future.isSuccess())
 							logger.debug("summary stream IO completed. success!");
 						else {
-							logger.error("summary stream IO completed. did not send info:{}", future.getCause());
+							logger.error("summary stream IO completed. did not send info: {}", future.getCause());
 						}
 					}
 
 				});
 
 			} catch (Exception e) {
-				logger.error("unrecognized exception in sending summary stream:{} ", e.getMessage());
+				logger.error("unrecognized exception in sending summary stream: {}", e.getMessage());
 			}
 		}
 	}
@@ -333,24 +333,26 @@ public class Collector {
 			// of these are not received it knows server is down
 			// so it cleans up all the connections.
 			SendMapMessage((byte) 61, 0, "user.pid:sid@host\n&pgm=dCacheXrootdDoor&ver=5.0.0&inst=anon&port=0&site=" + sitename);
-			String res = new String();
-			res += "Report ----------------------------------------------------\n";
-			res += "Connection Attempts:     " + connectionAttempts.get() + "\n";
-			res += "Current Connections:     " + cmap.size() + "\n";
-			res += "Connections established: " + successfulConnections.toString() + "\n";
-			res += "Bytes Read:              " + totBytesRead.toString() + "\n";
-			res += "Bytes Written:           " + totBytesWriten.toString() + "\n";
-			res += "-----------------------------------------------------------\n";
-			res += "Current connections:\n";
-			for (Map.Entry<Integer, ConnectionInfo> entry : cmap.entrySet()) {
-				res += entry.getKey() + "\t\t" + entry.getValue().toString() + "\n";
+			if (logger.isInfoEnabled()) {
+				StringBuilder res = new StringBuilder();
+				res.append("Report ----------------------------------------------------\n");
+				res.append("Connection Attempts:     ").append(connectionAttempts.get()).append("\n");
+				res.append("Current Connections:     ").append(cmap.size()).append("\n");
+				res.append("Connections established: ").append(successfulConnections.toString()).append("\n");
+				res.append("Bytes Read:              ").append(totBytesRead.toString()).append("\n");
+				res.append("Bytes Written:           ").append(totBytesWriten.toString()).append("\n");
+				res.append("-----------------------------------------------------------\n");
+				res.append("Current connections:\n");
+				for (Map.Entry<Integer, ConnectionInfo> entry : cmap.entrySet()) {
+					res.append(entry.getKey()).append("\t\t").append(entry.getValue().toString()).append("\n");
+				}
+				logger.info(res.toString());
 			}
-			logger.info(res);
 		}
 	}
 
 	private class SendDetailedStatisticsProducer extends TimerTask {
-		private UDPmessage mess;
+		private final UDPmessage mess;
 
 		SendDetailedStatisticsProducer(UDPmessage m) {
 			this.mess = m;

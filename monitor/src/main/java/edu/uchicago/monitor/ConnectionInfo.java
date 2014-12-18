@@ -7,12 +7,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ConnectionInfo {
-	final static Logger logger = LoggerFactory.getLogger(ConnectionInfo.class);
-	public int connectionID;
+	private final static Logger logger = LoggerFactory.getLogger(ConnectionInfo.class);
+
+	private final int connectionID;
 	public UserInfo ui;
-	public long duration;
-	private int serverPort;
-	public ConcurrentHashMap<Integer, FileStatistics> allFiles;
+	public final long duration;
+	private final int serverPort;
+	public final ConcurrentHashMap<Integer, FileStatistics> allFiles;
 
 	public Boolean disconnected; // initially this is 0. on disconnect will be
 									// changed to 1 and upon sending f-stream
@@ -22,8 +23,8 @@ public class ConnectionInfo {
 		this.disconnected = false;
 		this.connectionID = connID;
 		this.serverPort = DetailedLocalSendingPort;
-		duration = System.currentTimeMillis();
-		allFiles = new ConcurrentHashMap<Integer, FileStatistics>();
+		this.duration = System.currentTimeMillis();
+		this.allFiles = new ConcurrentHashMap<>();
 	}
 
 	public void ConnectionClose() {
@@ -54,12 +55,12 @@ public class ConnectionInfo {
 	}
 
 	public String toString() {
-		String ret = "disconnected: " + disconnected + "\t\tduration: " + (System.currentTimeMillis() - duration) / 1000 + "\n" + ui.toString();
-		for(Map.Entry<Integer, FileStatistics> fi:allFiles.entrySet()){
-			ret += "\n handle: " + fi.getKey() + "\t path: " + fi.getValue().toString();
+		StringBuilder ret = new StringBuilder();
+		ret.append("disconnected: ").append(disconnected).append("\t\tduration: ").append((System.currentTimeMillis() - duration) / 1000).append("\n").append(ui);
+		for (Map.Entry<Integer, FileStatistics> fi : allFiles.entrySet()){
+			ret.append("\n handle: ").append(fi.getKey()).append("\t path: ").append(fi.getValue());
 		}
-		return ret;
-
+		return ret.toString();
 	}
 
 }

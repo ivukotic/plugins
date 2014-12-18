@@ -9,7 +9,7 @@ public class UDPmessage {
 	private boolean available = false;
 
 	public synchronized ChannelBuffer get() {
-		while (available == false) {
+		while (!available) {
 			try {
 				wait();
 			} catch (InterruptedException e) {
@@ -21,7 +21,7 @@ public class UDPmessage {
 	}
 
 	public synchronized void put(ChannelBuffer value) {
-		while (available == true) {
+		while (available) {
 			try {
 				wait();
 			} catch (InterruptedException e) {
