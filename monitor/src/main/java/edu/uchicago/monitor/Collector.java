@@ -95,7 +95,7 @@ public class Collector {
 		this.properties = properties;
 		
 		// if not defined will try to get it using getHostName.
-		String pServerName = properties.getProperty("servername");
+		String pServerName = properties.getProperty("xrootd.monitor.servername");
 		if (pServerName != null) {
 			servername = pServerName;
 		} else {
@@ -109,7 +109,7 @@ public class Collector {
 			}
 		}
 		
-		String pVO = properties.getProperty("vo");
+		String pVO = properties.getProperty("xrootd.monitor.vo");
 		if (pVO != null){
 			logger.info("Setting VO to {}", pVO);
 			virtualOrganization = pVO;
@@ -117,8 +117,8 @@ public class Collector {
 			logger.warn("Could not get VO. Will set it to -unknown-");
 			virtualOrganization = "unknown";
 		}
-		
-		String pSitename = properties.getProperty("site");
+
+		String pSitename = properties.getProperty("xrootd.monitor.site");
 		if (pSitename != null)
 			sitename = pSitename;
 		else
@@ -274,7 +274,7 @@ public class Collector {
 			STATISTICSend = "</statistics>";
 
 			// needs instance name and proper port - how to get it from dCache?
-			info = "<stats id=\"info\"><host>" + servername + "</host><port>1096</port><name>anon</name></stats>";
+			info = "<stats id=\"info\"><host>" + servername + "</host><port>1096</port><name>"+sitename+"</name></stats>";
 
 			SGENstart = "<stats id=\"sgen\"><as>1</as><et>" + a.delay + "</et>";
 			SGENend = "</stats>";

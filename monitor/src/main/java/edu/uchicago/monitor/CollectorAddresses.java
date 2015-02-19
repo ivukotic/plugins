@@ -21,7 +21,7 @@ public class CollectorAddresses {
 	
 	public void init(Properties properties){
 
-		String pSummary = properties.getProperty("summary");
+		String pSummary = properties.getProperty("xrootd.monitor.summary");
 		if (pSummary != null) {
 			for (String summaryAddress : pSummary.split(",")) {
 				try {
@@ -32,7 +32,7 @@ public class CollectorAddresses {
 			}
 		}
 
-		String pDetailed = properties.getProperty("detailed");
+		String pDetailed = properties.getProperty("xrootd.monitor.detailed");
 		if (pDetailed != null) {
 			for (String detailedAddress : pDetailed.split(",")) {
 				try {
