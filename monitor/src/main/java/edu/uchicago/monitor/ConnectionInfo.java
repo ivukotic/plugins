@@ -19,7 +19,7 @@ public class ConnectionInfo {
 									// changed to 1 and upon sending f-stream
 									// info will get removed.
 
-	public ConnectionInfo(int connID, int DetailedLocalSendingPort) {
+	public ConnectionInfo(int connID, int DetailedLocalSendingPort) { // why on earth it needs serverPort?
 		this.disconnected = false;
 		this.connectionID = connID;
 		this.serverPort = DetailedLocalSendingPort;

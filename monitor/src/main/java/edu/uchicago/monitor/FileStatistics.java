@@ -19,7 +19,7 @@ class FileStatistics {
 
 	FileStatistics(int fc) {
 		this.fileCounter = fc;
-	}
+	} 
 
 	void close() {
 		state |= 0x0004;

@@ -1,12 +1,19 @@
 package edu.uchicago.monitor;
 
+import java.net.InetSocketAddress;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 
 public class Address {
-	
+
+	private final static Logger logger = LoggerFactory.getLogger(Address.class);
 	public final String address;
 	public final int port;
 	public final int delay;
 	public final int outboundport;
+	private final InetSocketAddress destination;
 
 	public Address(String param) throws IllegalArgumentException {
 		String[] temp;
@@ -41,10 +48,14 @@ public class Address {
 			delay = 60;
 		}
 		this.outboundport = outboundport;
+		this.destination = new InetSocketAddress(this.address,this.port);
+	}
+	
+	public InetSocketAddress getDestination(){
+		return this.destination;
 	}
 
-	@Override
-	public String toString() {
-		return "Hostname: " + address + "\t port: " + port + ".\t Sending each " + delay + " seconds. Outbound port: " + outboundport + "\n";
+	public void print() {
+		logger.info("Hostname: " + address + "\t port: " + port + ".\t Sending each " + delay + " seconds. Outbound port: " + outboundport + "\n");
 	}
 }

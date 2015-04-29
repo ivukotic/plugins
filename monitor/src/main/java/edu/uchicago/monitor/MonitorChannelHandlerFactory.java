@@ -6,7 +6,7 @@ import java.util.Properties;
 import java.util.Set;
 
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
-import org.jboss.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

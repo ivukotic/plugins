@@ -52,28 +52,24 @@ public class CollectorAddresses {
 		}
 	}
 	
-	@Override
-	public String toString() {
-		StringBuilder res = new StringBuilder();
+	public void print() {
 		if (summary.size() > 0) {
-			res.append("Summary information will be sent to: \n");
+			logger.info("Summary information will be sent to:");
 			for (Address a : summary) {
-				res.append(a);
+				a.print();
 			}
 		} else {
-			res.append("Summary information will not be sent.\n");
+			logger.warn("Summary information will not be sent.");
 		}
 
 		if (detailed.size() > 0) {
-			res.append("Detailed information will be sent to: \n");
+			logger.info("Detailed information will be sent to:");
 			for (Address a : detailed) {
-				res.append(a.toString());
-				break;
+				a.print();
 			}
 		} else {
-			res.append("Detailed information will not be sent.\n");
+			logger.warn("Detailed information will not be sent.");
 		}
-		return res.toString();
 	}
 
 }

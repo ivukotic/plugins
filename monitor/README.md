@@ -12,13 +12,13 @@ The plugin can be tested by loading it with the xrootd4j standalone
 server available from http://github.com/dcache/xrootd4j:
 
     java -Dlog=debug  \
-		 -Dxrootd.monitor.sitename=TEST.uc \
+		 -Dxrootd.monitor.site=TEST.uc \
 		 -Dxrootd.monitor.summary=test.stanford.edu:9931:60,localhost:9931:17 \
-		 -Dxrootd.monitor.detailed=localhost:9930:13
-		 -Dxrootd.monitor.vo=atlas
-         -jar /path/to/xrootd4j/xrootd4j-standalone-1.1.0-jar-with-dependencies.jar \
-         --plugins target/monitor-1.0-SNAPSHOT/ \
-         --handler authn:none,edu.uchicago.monitor
+		 -Dxrootd.monitor.detailed=localhost:9930:13 \
+		 -Dxrootd.monitor.vo=atlas \
+         -jar /path/to/xrootd4j/xrootd4j-standalone-2.1.0-jar-with-dependencies.jar \
+         --plugins target/monitor/ \
+         --handler edu.uchicago.monitor,authn:none
 
 You may select several destinations to send collected information to. Each destination is given in form:
 <hostname>:<port>[:<interval>[:<outbound port>]]

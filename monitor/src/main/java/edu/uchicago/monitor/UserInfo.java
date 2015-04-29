@@ -3,7 +3,7 @@ package edu.uchicago.monitor;
 public class UserInfo {
 	private final String name;
 	private final int pid;
-	private String host;
+	private String host; 
 	private int port;
 	private final int serverPort;
 

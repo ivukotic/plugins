@@ -1,6 +1,12 @@
 package edu.uchicago.monitor;
 
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+
 import java.io.File;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.UnknownHostException;
@@ -10,37 +16,22 @@ import java.util.Properties;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.jboss.netty.bootstrap.ConnectionlessBootstrap;
-import org.jboss.netty.buffer.ChannelBuffer;
-
-import static org.jboss.netty.buffer.ChannelBuffers.*;
-
-import org.jboss.netty.channel.ChannelFuture;
-import org.jboss.netty.channel.ChannelFutureListener;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.channel.Channels;
-import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
-import org.jboss.netty.channel.socket.DatagramChannel;
-import org.jboss.netty.channel.socket.DatagramChannelFactory;
-import org.jboss.netty.channel.socket.nio.NioDatagramChannelFactory;
-import org.jboss.netty.handler.codec.string.StringDecoder;
-import org.jboss.netty.handler.codec.string.StringEncoder;
-import org.jboss.netty.util.CharsetUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import static io.netty.buffer.Unpooled.*;
 
 public class Collector {
 
 	private final static Logger logger = LoggerFactory.getLogger(Collector.class);
 
+	private Properties properties;
 	private String servername;
 	private String sitename;
-	private Properties properties;
+	private String virtualOrganization;
 
 	private int tos; // time of server start
 	private int tosc; // time of start of info collection
@@ -56,8 +47,6 @@ public class Collector {
 	private byte fseq = 0; // sequence for f-stream
 	private byte pseq = 0; // sequence for all other streams.
 
-	private DatagramChannelFactory f;
-	private ConnectionlessBootstrap cbsSummary;
 	private final Map<Integer, ConnectionInfo> cmap = new ConcurrentHashMap<Integer, ConnectionInfo>();
 
 	private AtomicInteger connectionAttempts = new AtomicInteger();
@@ -68,32 +57,31 @@ public class Collector {
 	private CollectorAddresses ca = new CollectorAddresses();
 
 	private final UDPsender sender;
-	private final UDPmessage mess;
+	private final UDPmessage myDetailedMessage;
 	private int DetailedLocalSendingPort;
 	private Timer tDetailed;
-	private float factor;
-	private String virtualOrganization;
+	private float factor=1;
 
+	private DatagramSocket summarySocket = null;
 
 	public Collector() {
-    	logger.debug("Collector constructor!");
+		logger.debug("Collector constructor!");
 		sender = new UDPsender();
-		mess = new UDPmessage();
+		myDetailedMessage = new UDPmessage();
 	}
-	
-	
-	public ConnectionInfo getCI(Integer connid) {
+
+	public ConnectionInfo getCI(int connid) {
 		return cmap.get(connid);
 	}
 
 	void init(Properties properties) {
-		
-		if (this.properties != null){
-	    	logger.debug("Collector properties were already set...");
-	    	return;
+
+		if (this.properties != null) {
+			logger.debug("Collector properties were already set...");
+			return;
 		}
 		this.properties = properties;
-		
+
 		// if not defined will try to get it using getHostName.
 		String pServerName = properties.getProperty("xrootd.monitor.servername");
 		if (pServerName != null) {
@@ -108,12 +96,12 @@ public class Collector {
 				e.printStackTrace();
 			}
 		}
-		
+
 		String pVO = properties.getProperty("xrootd.monitor.vo");
-		if (pVO != null){
+		if (pVO != null) {
 			logger.info("Setting VO to {}", pVO);
 			virtualOrganization = pVO;
-		}else{
+		} else {
 			logger.warn("Could not get VO. Will set it to -unknown-");
 			virtualOrganization = "unknown";
 		}
@@ -125,9 +113,9 @@ public class Collector {
 			sitename = "anon";
 
 		ca.init(properties);
-		logger.info(ca.toString());
+		ca.print();
 
-		DetailedLocalSendingPort = sender.init(ca, mess);
+		sender.init(ca, myDetailedMessage);
 		sender.start();
 
 		tos = (int) (System.currentTimeMillis() / 1000L);
@@ -140,37 +128,25 @@ public class Collector {
 			pid = 123456;
 		}
 
-		f = new NioDatagramChannelFactory(Executors.newCachedThreadPool());
-
-		// this one is for sending summary data
-		cbsSummary = new ConnectionlessBootstrap(f);
-		cbsSummary.setOption("localAddress", new InetSocketAddress(0));
-		cbsSummary.setOption("broadcast", "true");
-		cbsSummary.setOption("connectTimeoutMillis", 10000);
-
-		cbsSummary.setPipelineFactory(new ChannelPipelineFactory() {
-			public ChannelPipeline getPipeline() throws Exception {
-				return Channels.pipeline(new StringEncoder(CharsetUtil.ISO_8859_1), new StringDecoder(CharsetUtil.ISO_8859_1),
-						new SimpleChannelUpstreamHandler());
-			}
-		});
+		try {
+			summarySocket = new DatagramSocket();
+		} catch (IOException e) {
+			logger.warn("can not create UDP summary socket:" + e.getLocalizedMessage());
+		}
 
 		for (Address a : ca.summary) {
 			Timer timer = new Timer();
 			timer.schedule(new SendSummaryStatisticsTask(a), 0, a.delay * 1000);
-			cbsSummary.setOption("localAddress", new InetSocketAddress(a.outboundport));
-			logger.info("Setting summary monitoring local port (outbound) to: {}", a.outboundport);
 		}
 
 		Timer timer = new Timer();
 		// this is used for printing out state and sending "=" stream
 		timer.schedule(new currentStatus(), 0, 5 * 60 * 1000);
 
-		factor = 1;
 		createReportingThreads();
 	}
 
-	// this is rescheduling sending of information in case UDP packets would
+	// this is (re)scheduling sending of information in case UDP packets would
 	// grow too large
 	private void createReportingThreads() {
 		if (tDetailed != null) {
@@ -180,11 +156,11 @@ public class Collector {
 		tDetailed = new Timer();
 		if (ca.reportDetailed == true) {
 			logger.warn("detailed reporting timer set at {} ms.", ca.detailed.get(0).delay * 1000 * factor);
-			tDetailed.schedule(new SendDetailedStatisticsProducer(mess), 2000, (long) (ca.detailed.get(0).delay * 1000 * factor));
+			tDetailed.schedule(new SendDetailedStatisticsProducer(myDetailedMessage), 2000, (long) (ca.detailed.get(0).delay * 1000 * factor));
 		}
 	}
 
-	public void addConnectionAttempt() {
+	public void addLoginAttempt() {
 		connectionAttempts.getAndIncrement();
 	}
 
@@ -220,7 +196,6 @@ public class Collector {
 	}
 
 	public void loggedEvent(int connectionId, SocketAddress remoteAddress) {
-
 		ConnectionInfo ci = cmap.get(connectionId);
 		if (ci != null) {
 			ci.logUserResponse(((InetSocketAddress) remoteAddress).getHostName(), ((InetSocketAddress) remoteAddress).getPort());
@@ -237,7 +212,7 @@ public class Collector {
 			pseq += 1;
 
 			short plen = (short) (12 + content.length());
-			ChannelBuffer db = dynamicBuffer(plen);
+			ByteBuf db = buffer(plen);
 
 			// main header
 			db.writeByte(mtype);
@@ -246,35 +221,32 @@ public class Collector {
 			db.writeInt(tos);
 			db.writeInt(dictid); // this is dictID
 			db.writeBytes(content.getBytes());
-			mess.put(db);
+			myDetailedMessage.put(db);  // something is not emptying this so buffer never gets freed ?
 
 		} catch (Exception e) {
 			logger.error("unrecognized exception: {} ", e.getMessage());
 		}
+
+		logger.info("SendMapMessage DONE.");
 	}
 
 	private class SendSummaryStatisticsTask extends TimerTask {
-		private final InetSocketAddress destination;
+		private final Address a;
 		private final String info;
 		private final String STATISTICSstart, STATISTICSend;
 		private final String SGENstart, SGENend;
 		private final String LINKstart, LINKend;
-		private final DatagramChannel c;
 		private long lastUpdate;
 
 		SendSummaryStatisticsTask(Address a) {
-			c = (DatagramChannel) cbsSummary.bind();
-			destination = new InetSocketAddress(a.address, a.port);
-			STATISTICSstart = "<statistics ver=\"v1.9.12.21\" pgm=\"xrootd\" ins=\"anon\"" +
-							  " tos=\"" + tos + "\"" +
-							  " src=\"" + servername + ":" + c.getLocalAddress().getPort() + "\"" +
-							  " host=\"" + servername + "\"" +
-							  " site=\"" + sitename + "\"" +
-							  " pid=\"" + pid + "\"";
+			this.a = a;
+
+			STATISTICSstart = "<statistics ver=\"v6.0.1\" pgm=\"xrootd\" ins=\"anon\"" + " tos=\"" + tos + "\"" + " src=\"" + servername + ":" + pid + "\""
+					+ " host=\"" + servername + "\"" + " site=\"" + sitename + "\"" + " pid=\"" + pid + "\"";
 			STATISTICSend = "</statistics>";
 
 			// needs instance name and proper port - how to get it from dCache?
-			info = "<stats id=\"info\"><host>" + servername + "</host><port>1096</port><name>"+sitename+"</name></stats>";
+			info = "<stats id=\"info\"><host>" + servername + "</host><port>1096</port><name>" + sitename + "</name></stats>";
 
 			SGENstart = "<stats id=\"sgen\"><as>1</as><et>" + a.delay + "</et>";
 			SGENend = "</stats>";
@@ -289,36 +261,22 @@ public class Collector {
 
 		public void run() {
 			try {
-				logger.debug("sending summary stream");
+				logger.debug("sending summary stream to: {}:{}", a.address, a.port);
 
 				long curTime = System.currentTimeMillis() / 1000L;
 				String sgen = SGENstart + "<toe>" + curTime + "</toe>" + SGENend;
 
-				String link = LINKstart +
-							  "<num>" + cmap.size() + "</num>" +
-							  "<maxn>" + maxConnections + "</maxn>" +
-							  "<tot>" + connectionAttempts + "</tot>" +
-							  "<in>" + totBytesWriten + "</in>" +
-							  "<out>" + totBytesRead + "</out>" +
-							  LINKend;
+				String link = LINKstart + "<num>" + cmap.size() + "</num>" + "<maxn>" + maxConnections + "</maxn>" + "<tot>" + connectionAttempts + "</tot>"
+						+ "<in>" + totBytesWriten + "</in>" + "<out>" + totBytesRead + "</out>" + LINKend;
 
 				String xmlmessage = STATISTICSstart + " tod=\"" + lastUpdate + "\">" + sgen + info + link + STATISTICSend;
 
 				logger.debug(xmlmessage);
 
 				lastUpdate = curTime;
-
-				ChannelFuture f = c.write(xmlmessage, destination);
-				f.addListener(new ChannelFutureListener() {
-					public void operationComplete(ChannelFuture future) throws Exception {
-						if (future.isSuccess())
-							logger.debug("summary stream IO completed. success!");
-						else {
-							logger.error("summary stream IO completed. did not send info: {}", future.getCause());
-						}
-					}
-
-				});
+				byte[] b = xmlmessage.getBytes();
+				DatagramPacket dp = new DatagramPacket(b, b.length, a.getDestination());
+				summarySocket.send(dp);
 
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending summary stream: {}", e.getMessage());
@@ -332,7 +290,7 @@ public class Collector {
 			// this is "=" stream. Collector neglects all the info in it. If 5
 			// of these are not received it knows server is down
 			// so it cleans up all the connections.
-			SendMapMessage((byte) 61, 0, "user.pid:sid@host\n&pgm=dCacheXrootdDoor&ver=5.0.0&inst=anon&port=0&site=" + sitename);
+			SendMapMessage((byte) 61, 0, "user.pid:sid@host\n&pgm=dCacheXrootdDoor&ver=7.0.0&inst=anon&port=0&site=" + sitename);
 			if (logger.isInfoEnabled()) {
 				StringBuilder res = new StringBuilder();
 				res.append("Report ----------------------------------------------------\n");
@@ -367,9 +325,8 @@ public class Collector {
 			try {
 				fseq += 1;
 
-				int plen = (int) (24); // this is length of 2 mandatory
-											// headers
-				ChannelBuffer db = dynamicBuffer(plen);
+				int plen = (int) (24); // this is length of 2 mandatory headers
+				ByteBuf db = Unpooled.buffer(plen);
 
 				// main header - XrdXrootdMonHeader - 8 bytes
 				db.writeByte((byte) 102); // 'f'
@@ -408,9 +365,7 @@ public class Collector {
 							// header
 							db.writeByte((byte) 1); // 1 - means isOpen
 							db.writeByte((byte) 0x01); // the lfn is present -
-														// 0x02
-														// is
-														// R/W
+														// 0x02 is R/W
 							int len = 21 + fs.filename.length();
 							plen += len;
 							db.writeShort(len); // size
@@ -418,7 +373,7 @@ public class Collector {
 							logger.debug("FOpened: {}", fs.fileCounter);
 							db.writeLong(fs.filesize); // filesize at open.
 							if (true) { // check if Filenames should be
-										// reported.
+								// reported.
 								db.writeInt(dictID);// user_dictid
 								db.writeBytes(fs.filename.getBytes());
 								// to make this "C" string end
@@ -484,7 +439,7 @@ public class Collector {
 								db.writeShort(11); // shortest readv segments
 								db.writeShort(12); // longest readv segments
 								db.writeLong(123456); // number of readv
-														// segments
+								// segments
 								db.writeInt(111000); // rdMin
 								db.writeInt(112000); // rdMax
 								db.writeInt(113000); // rvMin
@@ -508,9 +463,9 @@ public class Collector {
 								db.writeDouble(123.123);
 							}
 							// remove it
-							if(cent.getValue().allFiles.remove(fent.getKey())==null)
+							if (cent.getValue().allFiles.remove(fent.getKey()) == null)
 								logger.error("Could not remove closed file!");
-							
+
 							subpackets += 1;
 							plen += packlength;
 						}
@@ -538,24 +493,24 @@ public class Collector {
 				db.setShort(2, (short) plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
-				if (plen>0 && plen<32767)
+				if (plen > 0 && plen < 32767)
 					mess.put(db);
-				else 
+				else
 					logger.warn("f-stream message longer than 32k. Not sending it.");
 
-				// if message is long, half the reporting time
-				if (plen > 20000) {
-					if (factor > 0.1) {
-						factor = factor / 2;
-						createReportingThreads();
-					}
-				}
-				// if message is smaller and of reduced size increase the period
-				if (plen<10000 && factor < 1) {
-						factor = factor * 2;
-						createReportingThreads();
-				}
-				
+//				// if message is long, half the reporting time
+//				if (plen > 20000) {
+//					if (factor > 0.1) {
+//						factor = factor / 2;
+//						createReportingThreads();
+//					}
+//				}
+//				// if message is smaller and of reduced size increase the period
+//				if (plen < 10000 && factor < 1) {
+//					factor = factor * 2;
+//					createReportingThreads();
+//				}
+
 			} catch (Exception e) {
 				logger.error("unrecognized exception in sending f-stream:{} ", e.getMessage());
 			}

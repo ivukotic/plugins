@@ -1,14 +1,15 @@
 package edu.uchicago.monitor;
 
-import org.jboss.netty.buffer.ChannelBuffer;
+import io.netty.buffer.ByteBuf;
+
 
 public class UDPmessage {
 
-	private ChannelBuffer contents;
+	private ByteBuf contents;
 
 	private boolean available = false;
 
-	public synchronized ChannelBuffer get() {
+	public synchronized ByteBuf get() {
 		while (!available) {
 			try {
 				wait();
@@ -20,7 +21,7 @@ public class UDPmessage {
 		return contents;
 	}
 
-	public synchronized void put(ChannelBuffer value) {
+	public synchronized void put(ByteBuf value) {
 		while (available) {
 			try {
 				wait();
