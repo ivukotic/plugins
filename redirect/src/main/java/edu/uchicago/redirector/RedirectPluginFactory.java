@@ -8,7 +8,7 @@ import java.util.Set;
 import org.dcache.xrootd.plugins.ChannelHandlerFactory;
 
 import com.google.common.base.Strings;
-import org.jboss.netty.channel.ChannelHandler;
+import io.netty.channel.ChannelHandler;
 
 import static com.google.common.base.Preconditions.checkArgument;
 
