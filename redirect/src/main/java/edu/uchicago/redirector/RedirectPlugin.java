@@ -1,7 +1,7 @@
 package edu.uchicago.redirector;
 
-import io.netty.channel.ChannelDuplexHandler;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
 
 import org.slf4j.Logger;
@@ -11,7 +11,7 @@ import org.dcache.xrootd.protocol.messages.ErrorResponse;
 import org.dcache.xrootd.protocol.messages.OpenRequest;
 import org.dcache.xrootd.protocol.messages.RedirectResponse;
 
-public class RedirectPlugin extends ChannelDuplexHandler
+public class RedirectPlugin extends ChannelOutboundHandlerAdapter
 {
 
 	final static Logger logger = LoggerFactory.getLogger(RedirectPlugin.class);
