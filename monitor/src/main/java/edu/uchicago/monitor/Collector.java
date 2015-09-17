@@ -227,7 +227,7 @@ public class Collector {
 			logger.error("unrecognized exception: {} ", e.getMessage());
 		}
 
-		logger.info("SendMapMessage DONE.");
+		logger.debug("sending map message DONE.");
 	}
 
 	private class SendSummaryStatisticsTask extends TimerTask {
@@ -275,6 +275,7 @@ public class Collector {
 
 				lastUpdate = curTime;
 				byte[] b = xmlmessage.getBytes();
+				
 				DatagramPacket dp = new DatagramPacket(b, b.length, a.getDestination());
 				summarySocket.send(dp);
 
@@ -321,7 +322,7 @@ public class Collector {
 		}
 
 		private void sendFstream() {
-			logger.debug("sending detailed stream");
+			logger.debug("sending detailed stream.");
 			try {
 				fseq += 1;
 
@@ -493,8 +494,10 @@ public class Collector {
 				db.setShort(2, (short) plen);
 				db.setShort(12, xfrpackets);
 				db.setShort(14, subpackets);
-				if (plen > 0 && plen < 32767)
+				if (plen > 0 && plen < 32767){
 					mess.put(db);
+					logger.debug("sending detailed message DONE.");
+					}
 				else
 					logger.warn("f-stream message longer than 32k. Not sending it.");
 

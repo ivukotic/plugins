@@ -47,18 +47,19 @@ public class MonitorChannelHandlerFactoryTest {
 		logger.info("testing message sender");
 
 		Properties props = new Properties();
-		props.setProperty("site", "MWT2_UC");
-		props.setProperty("servername", "ilijasMac.uchicago.edu");
+		props.setProperty("xrootd.monitor.site", "MWT2_UC");
+		props.setProperty("xrootd.monitor.servername", "ilijasMac.uchicago.edu");
+		props.setProperty("xrootd.monitor.vo", "ATLAS");
 
-		props.setProperty("summary", "atl-prod05.slac.stanford.edu:9931:10");
-		// props.setProperty("summary","uct2-int.uchicago.edu:9931:10");
-		props.setProperty("detailed", "atl-prod05.slac.stanford.edu:9930:10:9999");
-		// props.setProperty("detailed","uct2-int.uchicago.edu:9930:10");
+		//props.setProperty("xrootd.monitor.summary", "atl-prod05.slac.stanford.edu:9931:10");
+		props.setProperty("xrootd.monitor.summary","uct2-int.mwt2.org:9931:4");
+		//props.setProperty("xrootd.monitor.detailed", "atl-prod05.slac.stanford.edu:9930:10:9999");
+		props.setProperty("xrootd.monitor.detailed","uct2-int.mwt2.org:9930:5");
 
 //		int cid=123456;
 		Collector c = new Collector();
 		c.init(props);
-		for (int w = 0; w < 3; w++) {
+		for (int w = 0; w < 4; w++) {
 
 			// user logged in message "u"
 //			c.SendMapMessage((byte) 117, cid, "");

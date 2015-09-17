@@ -29,15 +29,20 @@ public class UDPsender extends Thread {
 	}
 
 	public void run() {
-		byte[] b = message.get().array();
-		for (Address a : ca.detailed) {
-			DatagramPacket dp = new DatagramPacket(b, b.length, a.getDestination());
-			try {
-				detailedSocket.send(dp);
-			} catch (IOException e) {
-				logger.error("unrecognized exception in sending detailed stream: {}", e.getMessage());
+		logger.info("UDP sender started.");
+		while(true){	
+//			logger.debug("UDPsender trying to get message!!!!!!!!!!!!!");
+			byte[] b = message.get().array();
+//			logger.debug("UDPsender GOT message!!!!!!!!!!!!!");
+			for (Address a : ca.detailed) {
+				DatagramPacket dp = new DatagramPacket(b, b.length, a.getDestination());
+				try {
+					detailedSocket.send(dp);
+				} catch (IOException e) {
+					logger.error("unrecognized exception in sending detailed stream: {}", e.getMessage());
+				}
 			}
 		}
 	}
-
 }
+
