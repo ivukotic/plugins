@@ -92,4 +92,6 @@ when directly federating xrootd dCache doors one needs in addition an upstream r
 If your server is behind NAT, you should also define property servername in a form:
 	xrootd.monitor.servername=myserver.mydomain.org
 
+Upon the first start please check the log and make sure there are no warnings.
+
 

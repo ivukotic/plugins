@@ -18,6 +18,7 @@ import org.dcache.xrootd.protocol.messages.ReadVRequest;
 import org.dcache.xrootd.protocol.messages.WriteRequest;
 import org.dcache.xrootd.protocol.messages.XrootdRequest;
 import org.dcache.xrootd.protocol.messages.XrootdResponse;
+import org.dcache.xrootd.util.FileStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -180,7 +181,12 @@ public class MonitorChannelHandler extends ChannelDuplexHandler {
 			FileStatistics fs = new FileStatistics(fileCounter.get());
 			fs.filename = or.getPath();
 			fs.mode = mode;
-			fs.filesize = OR.getFileStatus().getSize();
+			FileStatus fileStatus=OR.getFileStatus();
+			if (fileStatus==null){
+				fs.filesize=0;
+			}else{
+				fs.filesize = fileStatus.getSize();
+			}
 			logger.debug("FILE OPEN RESPONSE  connId: {}    path :{},  fileCounter: {}", connId, fs.filename, fs.fileCounter);
 			collector.getCI(connId).addFile(OR.getFileHandle(), fs);
 		}
