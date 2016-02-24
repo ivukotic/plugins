@@ -5,7 +5,7 @@
 
 	<groupId>edu.uchicago.redirector</groupId>
 	<artifactId>redirector</artifactId>
-	<version>1.0.5</version>
+	<version>1.0.6</version>
 	<packaging>jar</packaging>
 
 	<name>dCache xrootd redirector plugin</name>
@@ -38,7 +38,7 @@
 		<dependency>
 			<groupId>org.dcache</groupId>
 			<artifactId>xrootd4j</artifactId>
-			<version>3.0.0</version>
+			<version>3.0.5</version>
 		</dependency>
 	</dependencies>
 
