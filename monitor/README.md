@@ -73,7 +73,7 @@ when directly federating xrootd dCache doors one needs in addition an upstream r
 	xrootd.n2n.site=rc_site
     
 	### plugins
-    xrootd.plugins=gplazma:gsi,authz:atlas-name-to-name-plugin,redirector
+    xrootd.plugins=gplazma:gsi,redirector,authz:atlas-name-to-name-plugin
     # for old dCache versions up to 2.6 use
 	# xrootd/xrootdPlugins=gplazma:gsi,authz:atlas-name-to-name-plugin,redirector
     	
